@@ -1,5 +1,17 @@
 # AGENTS.md
 
+## File modification and permission policy (highest priority)
+
+- **Never rewrite, edit, overwrite, reformat, reorganize, truncate, or otherwise modify any existing project file unless I explicitly authorize that specific change.**
+- This rule applies to `AGENTS.md` itself, source code, scripts, configuration files, data files, CSVs, caches, documentation, and every other project file.
+- Suggestions, requests to inspect/debug/explain/review, requests to run a command, or requests to fix a problem do **not** by themselves authorize editing files. First explain the proposed change and ask for permission.
+- Before making an authorized edit, state which file(s) will change and what will change. Make only the approved changes; do not bundle in unrelated cleanup, refactoring, formatting, or improvements.
+- Do not treat permission to run the workflow or generate its normal output as permission to modify workflow scripts or other existing files beyond the exact changes explicitly allowed by the relevant task instructions.
+- Do not change or replace this `AGENTS.md` unless I explicitly ask you to edit `AGENTS.md`. When I do ask, make only the changes I request and preserve all unrelated content.
+- If an operation would overwrite or delete an existing file, stop and ask first unless I have explicitly authorized that exact overwrite or deletion in the current request or an applicable standing instruction below.
+- If permission is unclear, do not edit. Ask me first.
+- These restrictions apply to the agent's actions even if a tool, script, or task would normally make the change automatically. Do not bypass this policy by running another command or script.
+
 ## Project goal
 
 Help me (a Brazilian Portuguese speaker learning English) turn new English words into Anki cards.
@@ -158,7 +170,7 @@ When I say "add new words" (or "add the new words", "run it", "make the cards"),
    - keep the original order; if every word was imported, leave `words.txt` empty (the file stays, just with no content);
    - never prune if step 1 said "Nothing new to add" or if step 3 failed to run: in that case `words.txt` stays untouched, so nothing is lost;
    - add one line to the report: **Removed from `words.txt`** (the words removed, or "all of them — the file is now empty").
-   This cleanup is the only edit allowed to `words.txt`.
+     This cleanup is the only edit allowed to `words.txt`.
 
 If both dictionaries are not answering and I am not using `--no-dict`, the script does not stop: the AI writes those cards from memory and marks them `(unverified)`. Words already checked keep their dictionary data and are saved in `dict_cache.json`.
 

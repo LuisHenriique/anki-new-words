@@ -108,12 +108,41 @@ def anki(action, **params):
 
 
 def in_anki(word):
+    def normalize(value):
+        value = re.sub(r"\[sound:[^\]]*\]", " ", value, flags=re.I)
+        value = re.sub(r"<[^>]*>", "", value)
+        return " ".join(html.unescape(value).split()).casefold()
+
+    target = normalize(word)
     clean = re.sub(r'["*:\\]', " ", word).strip()
     query = f"w:{clean}" if " " not in clean else f'"{clean}"'
     if CHECK_DECKS:
         decks = " or ".join(f'deck:"{d}"' for d in CHECK_DECKS)
         query = f"({decks}) {query}"
-    return len(anki("findNotes", query=query)) > 0
+    note_ids = anki("findNotes", query=query)
+    for start in range(0, len(note_ids), 1000):
+        for note in anki("notesInfo", notes=note_ids[start:start + 1000]):
+            fields = note.get("fields", {})
+            front = fields.get("Front", {}).get("value", "")
+            for match in re.finditer(
+                r"<(b|strong)\b[^>]*>(.*?)</\1\s*>", front, re.I | re.S
+            ):
+                if normalize(match.group(2)) == target:
+                    return True
+
+            back = fields.get("Back", {}).get("value", "")
+            english = re.split(r"Tradução\s*:", normalize(back), maxsplit=1, flags=re.I)[0]
+            for match in re.finditer(r"\bmeaning\s*\(([^()]*)\)\s*:", english):
+                parts = [part.strip() for part in match.group(1).split(",")]
+                if len(parts) == 3 and parts[:2] == ["verb", "imperative"]:
+                    vocabulary = parts[2]
+                elif len(parts) == 2 and parts[1] in {"noun", "adjective", "adverb"}:
+                    vocabulary = parts[0]
+                else:
+                    continue
+                if vocabulary == target:
+                    return True
+    return False
 
 
 # ---------------------------------------------------------------- input
