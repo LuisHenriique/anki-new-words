@@ -1,0 +1,4 @@
+# Runtime dependency for audio in import_to_anki.py.
+# Everything else (anki_words.py, check_csv.py, import_to_anki.py) uses only
+# the Python standard library.
+gTTS>=2.5
