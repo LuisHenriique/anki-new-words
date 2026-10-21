@@ -150,14 +150,14 @@ tentar de novo. Veja o passo 5 do `AGENTS.md`.
 Cada linha do CSV é `Front;Back`:
 
 ```text
-They <b>cling</b> to hope.;Meaning (cling, verb): hold tightly<br>Meaning (imperative form of the verb): cling!<br>Phonetic: /klɪŋ/<br>Tradução: agarrar-se, apegar-se, grudar
+They <b>cling</b> to hope.;Meaning (verb, imperative, cling): to hold tightly<br>Phonetic: /klɪŋ/<br>Tradução: agarrar-se, apegar-se, grudar
 ```
 
 - **Front** — uma frase natural em B2, com 6 a 10 palavras, palavra-alvo em
   `<b>...</b>`.
-- **Back** — um único significado curto, classe gramatical, linha do imperativo
-  para verbos, `Phonetic: /IPA/` e `Tradução:` em português brasileiro
-  (1 a 3 opções).
+- **Back** — um único significado curto, com a classe gramatical e, nos verbos,
+  a forma base na mesma etiqueta (`Meaning (verb, imperative, cling): ...`),
+  `Phonetic: /IPA/` e `Tradução:` em português brasileiro (1 a 3 opções).
 
 ---
 

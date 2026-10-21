@@ -90,6 +90,7 @@ For EACH item below return one JSON object with these keys:
 Only when "senses" is empty, ALSO fill these keys yourself:
   "pos": "noun", "verb", "adjective" or "adverb"
   "meaning": a short, simple English definition
+             For a verb, write it in the base form.
   "phonetic": IPA between slashes, example "/klɪŋ/"
   "base": the dictionary form of the word, example "entreat" for "entreated"
 Never invent anything else. Reply with ONLY a JSON array, no other text."""
@@ -538,9 +539,14 @@ def to_row(item, card):
         r"\(informal\)\s*", "", meaning, flags=re.I
     ).strip()  # avoid a double label
     informal = "(informal) " if is_informal else ""
-    back = f"Meaning ({w}, {pos}): {tag}{informal}{meaning}"
     if pos == "verb":
-        back += f"<br>Meaning (imperative form of the verb): {base.lower()}!"
+        # One single Meaning line: (verb, imperative, base_form): definition
+        back = (
+            f"Meaning (verb, imperative, {base.lower()}): "
+            f"{tag}{informal}{meaning.strip()}"
+        )
+    else:
+        back = f"Meaning ({w}, {pos}): {tag}{informal}{meaning}"
     if phonetic:
         back += f"<br>Phonetic: {phonetic}"
     back += f"<br>Tradução: {card.get('translation', '')}"

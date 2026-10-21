@@ -27,6 +27,8 @@ FIXED = INPUT.with_name(INPUT.stem + "_fixed.csv")
 
 POS = ("noun", "verb", "adjective", "adverb")
 MEANING_RE = re.compile(r"^Meaning \((.+?), (\w+)\): (.*)$")
+# New verb format: Meaning (verb, imperative, base_form): definition!
+VERB_MEANING_RE = re.compile(r"^Meaning \(verb, imperative, (.+?)\): (.*)$")
 IMPERATIVE_RE = re.compile(r"^Meaning \(imperative form of the verb\): (\S.*)!$")
 JUNK_RE = re.compile(r"\b(undefined|null|None|NaN)\b|```|\[\{|\}\]")
 
@@ -46,8 +48,16 @@ def auto_fix(row):
     ):  # label twice -> once, at the start
         m = MEANING_RE.match(parts[0])
         if m:
-            text = re.sub(r"\s*\(informal\)\s*", " ", m.group(3)).strip()
-            parts[0] = f"Meaning ({m.group(1)}, {m.group(2)}): (informal) {text}"
+            label, text = f"Meaning ({m.group(1)}, {m.group(2)})", m.group(3)
+        else:
+            vm = VERB_MEANING_RE.match(parts[0])
+            label = (
+                f"Meaning (verb, imperative, {vm.group(1)})" if vm else ""
+            )
+            text = vm.group(2) if vm else ""
+        if label:
+            text = re.sub(r"\s*\(informal\)\s*", " ", text).strip()
+            parts[0] = f"{label}: (informal) {text}"
     return [front, "<br>".join(parts)]
 
 
@@ -64,21 +74,31 @@ def check_row(row):
 
     # ---- back: first line decides the target word
     parts = back.split("<br>")
-    m = MEANING_RE.match(parts[0])
+    new_verb = False
     target = "?"
-    if not m:
-        add(
-            "ERROR",
-            "first line of the back must be: Meaning (word, part of speech): ...",
-        )
-        pos, meaning = "", ""
+    m = VERB_MEANING_RE.match(parts[0])
+    if m:
+        new_verb = True
+        target, pos, meaning = m.group(1).strip(), "verb", m.group(2)
+        if not re.match(r"^[A-Za-z][A-Za-z' -]*$", target):
+            add("ERROR", f"base form in the verb label looks wrong: '{target}'")
     else:
-        target, pos, meaning = m.group(1), m.group(2).lower(), m.group(3)
-        if pos not in POS:
+        m = MEANING_RE.match(parts[0])
+        if not m:
             add(
                 "ERROR",
-                f"part of speech '{pos}' must be noun, verb, adjective or adverb",
+                "first line of the back must be: Meaning (word, part of speech): ... "
+                "or, for verbs: Meaning (verb, imperative, base_form): ...",
             )
+            pos, meaning = "", ""
+        else:
+            target, pos, meaning = m.group(1), m.group(2).lower(), m.group(3)
+            if pos not in POS:
+                add(
+                    "ERROR",
+                    f"part of speech '{pos}' must be noun, verb, adjective or adverb",
+                )
+    if m:
         body = re.sub(r"\((informal|unverified)\)", "", meaning, flags=re.I).strip()
         if len(body) < 3:
             add("ERROR", "the meaning is empty")
@@ -104,7 +124,13 @@ def check_row(row):
     phonetic = [p for p in rest if p.startswith("Phonetic:")]
     trad = [p for p in rest if p.startswith("Tradução:")]
     other = [p for p in rest if p not in imperative + phonetic + trad]
-    if pos == "verb":
+    if new_verb:
+        if imperative:
+            add(
+                "ERROR",
+                "verb cards use ONE Meaning line; remove 'Meaning (imperative form of the verb)'",
+            )
+    elif pos == "verb":
         if not imperative:
             add(
                 "ERROR",
@@ -143,7 +169,7 @@ def check_row(row):
         else:
             if len(bolds) > 1:
                 add("WARNING", "more than one bold part in the sentence")
-            if target != "?" and bolds[0].strip().lower() != target.lower():
+            if target != "?" and not new_verb and bolds[0].strip().lower() != target.lower():
                 add(
                     "WARNING",
                     f"bold word '{bolds[0]}' is different from the card word '{target}'",

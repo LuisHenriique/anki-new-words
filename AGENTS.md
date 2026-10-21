@@ -42,7 +42,7 @@ Front;Back
 Example:
 
 ```
-They <b>cling</b> to hope.;Meaning (cling, verb): hold tightly<br>Meaning (imperative form of the verb): cling!<br>Phonetic: /klɪŋ/<br>Tradução: agarrar-se, apegar-se, grudar
+They <b>cling</b> to hope.;Meaning (verb, imperative, cling): to hold tightly<br>Phonetic: /klɪŋ/<br>Tradução: agarrar-se, apegar-se, grudar
 ```
 
 ### Front
@@ -62,7 +62,7 @@ Before delivering a deck, verify each card:
 - The example sentence has at least 5 words.
 - Most sentences have 6–10 words.
 - Sentences over 15 words exist only when the extra context is genuinely helpful.
-- The target vocabulary is in `<b>...</b>` and matches the card word.
+- The target vocabulary is in `<b>...</b>` in the sentence, in the form that appears on the Front.
 - The sentence is natural, clear, B2-level and shows the meaning used on the back.
 
 ### Back
@@ -72,7 +72,12 @@ Before delivering a deck, verify each card:
   - If the word has several senses, keep only the one that fits the context phrase (or the most common one when there is no context).
 - Part of speech must be one of: noun, verb, adjective, adverb.
 - If the word is informal or slang, put `(informal)` before the meaning.
-- Only for verbs, add: `Meaning (imperative form of the verb): ...`
+- For verbs, write exactly ONE Meaning line in this shape: `Meaning (verb, imperative, base_form): definition`
+  - `base_form` is the dictionary form: `nod` for `nodded`, `cling` for `cling`.
+  - Write the definition normally, with no forced final punctuation. Example: `Meaning (verb, imperative, nod): to move your head up and down to show agreement`
+  - Never add a second line like `Meaning (imperative form of the verb): nod!`.
+  - This applies to every verb, regular or irregular, whatever tense or form appears on the Front.
+- For nouns, adjectives and adverbs keep `Meaning (word, part of speech): definition`.
 - `Phonetic: /IPA/`
 - `Tradução:` Brazilian Portuguese, one to three options separated by commas, from the most common to the least common.
   - The Portuguese must be clear, natural and coherent, with correct grammar, spelling and accents.
