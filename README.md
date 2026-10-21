@@ -43,7 +43,40 @@ python -c "import gtts; print(gtts.__version__)"
 
 ---
 
-## 2. Adicione as palavras
+## 2. Modo de um comando (recomendado)
+
+Com as palavras já no `words.txt` e o Anki aberto, rode:
+
+```bash
+python run.py
+```
+
+Ele executa tudo em sequência:
+
+1. gera os cartões (`anki_words.py --no-dict`);
+2. confere e corrige o CSV (`check_csv.py --fix --anki`);
+3. importa com áudio (`import_to_anki.py anki_import_fixed.csv`);
+4. remove do `words.txt` as palavras que chegaram ao Anki, mantendo as que falharam;
+5. imprime um resumo com ortografia corrigida, duplicados, linhas recusadas, notas importadas e áudio.
+
+Opções úteis:
+
+```bash
+python run.py                    # usa words.txt
+python run.py minha_lista.txt    # usa outro arquivo
+python run.py --no-audio         # importa sem áudio
+python run.py --dry-run          # gera e confere o CSV, não importa e não mexe no words.txt
+python run.py --keep             # importa, mas não limpa o words.txt
+python run.py --stop-on-error    # para antes de importar se o CSV tiver ERROR
+```
+
+Se o `run.py` falhar, os passos manuais das seções 3 a 6 continuam valendo como plano B.
+
+---
+
+## 3. Passo a passo detalhado
+
+### 3.1 Adicione as palavras
 
 Abra `words.txt` e coloque **um item por linha**. Dois formatos são aceitos:
 
@@ -64,7 +97,7 @@ entreated
 
 ---
 
-## 3. Gere os cartões
+### 3.2 Gere os cartões
 
 Execute na pasta do projeto:
 
@@ -91,7 +124,7 @@ python anki_words.py other.txt --no-dict
 
 ---
 
-## 4. Confira o CSV antes de importar
+### 3.3 Confira o CSV antes de importar
 
 ```bash
 python check_csv.py --fix --anki
@@ -119,7 +152,7 @@ python check_csv.py --fix
 
 ---
 
-## 5. Importe para o Anki com áudio
+### 3.4 Importe para o Anki com áudio
 
 ```bash
 python import_to_anki.py anki_import_fixed.csv
@@ -136,7 +169,7 @@ Linhas com ERROR são puladas automaticamente; as boas continuam sendo importada
 
 ---
 
-## 6. O que acontece com o `words.txt`
+### 3.5 O que acontece com o `words.txt`
 
 Depois de uma importação bem-sucedida, as palavras que chegaram ao Anki
 (importadas **ou** já existentes) são removidas do `words.txt`. Só ficam as
@@ -165,6 +198,8 @@ They <b>cling</b> to hope.;Meaning (verb, imperative, cling): to hold tightly<br
 
 | Comando | O que faz |
 | --- | --- |
+| `python run.py` | Pipeline completo: gera, confere, importa com áudio e limpa o `words.txt` |
+| `python run.py --dry-run` | Gera e confere o CSV, sem importar e sem mexer no `words.txt` |
 | `python anki_words.py --no-dict` | Cria cartões a partir do `words.txt` |
 | `python anki_words.py `*`arquivo`*` --no-dict` | Cria cartões a partir de outra lista |
 | `python check_csv.py --fix --anki` | Testa e corrige o CSV com segurança |
@@ -206,6 +241,7 @@ Learning Language/
 ├── README.md                # este guia
 ├── AGENTS.md                # regras que o agente segue
 ├── words.txt                # entrada: palavras esperando virar cartões
+├── run.py                   # um comando para todo o pipeline
 ├── anki_words.py            # passo 1: words.txt  -> anki_import.csv
 ├── check_csv.py             # passo 2: valida / corrige o CSV
 ├── import_to_anki.py        # passo 3: CSV -> notas no Anki + áudio

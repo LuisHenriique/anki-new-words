@@ -12,6 +12,7 @@ I collect words in `words.txt`. The agent checks Anki for duplicates, makes the 
 - `anki_import.csv`: the output file (semicolon separated, UTF-8).
 - `check_csv.py`: tests every line of the CSV (errors and warnings).
 - `import_to_anki.py`: adds the good lines of the CSV to Anki through AnkiConnect, only when I ask.
+- `run.py`: one command for the whole pipeline (generate, check, import with audio, clean `words.txt`).
 
 ## Input format (`words.txt`)
 
@@ -124,6 +125,8 @@ Before delivering a deck, verify each card:
 ## Default task: one command does everything
 
 When I say "add new words" (or "add the new words", "run it", "make the cards"), do ALL of the steps below, in order, without asking me anything and without waiting for my approval between steps:
+
+**One command:** `python run.py` performs steps 1–5 in order and prints a summary with the numbers for the report. Prefer it; the numbered steps below describe exactly what it must do and remain the fallback if it fails. Do not run `run.py` and the single steps again for the same words.
 
 1. **Make the cards.** Run in the project folder:
    ```bash
