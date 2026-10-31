@@ -152,7 +152,7 @@ def main():
     preflight(no_audio)
 
     # 1. cards
-    code, out = run_step("1/4 Making the cards", ["anki_words.py", str(words), "--no-dict"])
+    code, out = run_step("1/4 Making the cards", ["anki_words.py", str(words)])
     if "Nothing new to add" in out:
         print("\nNothing new to add: every word is already in Anki. words.txt was not changed.")
         return 0

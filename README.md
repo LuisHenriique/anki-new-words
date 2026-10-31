@@ -9,6 +9,8 @@ Transforma uma lista de palavras em inglês em cartões do Anki com:
 - Tradução para português brasileiro.
 - Áudio da frase gerado pelo Google Text-to-Speech, via gTTS.
 
+O conteúdo é gerado pela IA, sem consultas a APIs de dicionários. Revise os significados e a pronúncia quando necessário.
+
 O fluxo completo é coordenado por `run.py`:
 
 ```text
@@ -50,7 +52,7 @@ Configure os itens abaixo antes da primeira execução. Execute os comandos dest
 | Baralhos | A busca de duplicatas usa apenas **English Vocabulary** e **B2 First**, incluindo subbaralhos. |
 | OpenCode | Disponível no terminal; é chamado pelo script para gerar os cartões com IA. |
 | gTTS | Instalado no mesmo ambiente Python usado para executar os scripts. |
-| Internet | Necessária para a IA, o Google Text-to-Speech e os dicionários, quando habilitados. |
+| Internet | Necessária para a IA e o Google Text-to-Speech. |
 
 ### 1. Configure o AnkiConnect
 
@@ -120,7 +122,7 @@ python run.py
 
 O comando executa, nesta ordem:
 
-1. Gera os cartões sem consultar dicionários, usando a opção `--no-dict`.
+1. Gera os cartões com IA, sem consultar dicionários.
 2. Valida o CSV, verifica duplicatas no Anki e salva as correções seguras.
 3. Importa as linhas válidas com áudio.
 4. Remove da lista os itens importados ou já existentes no Anki.
@@ -179,7 +181,7 @@ Adicione os itens a `words.txt`, seguindo o formato da lista. Abra o Anki e exec
 #### 2. Gere os cartões
 
 ```bash
-python anki_words.py --no-dict
+python anki_words.py
 ```
 
 O script corrige a ortografia, consulta duplicatas nos dois baralhos configurados, lista os itens ignorados e pede à IA a frase, o significado, o IPA e a tradução. O resultado é salvo em `anki_import.csv`.
@@ -187,18 +189,12 @@ O script corrige a ortografia, consulta duplicatas nos dois baralhos configurado
 Para usar outra lista:
 
 ```bash
-python anki_words.py other.txt --no-dict
+python anki_words.py other.txt
 ```
 
-**Modo atual:** os dicionários estão indisponíveis. Com `--no-dict`, a IA escreve o conteúdo sem consultar essas fontes; os cartões não recebem a marca `(unverified)`.
+**Geração com IA:** a IA escreve o significado, o IPA, a frase e a tradução. Não há consulta a dicionários nem leitura ou gravação de cache. Os novos cartões não recebem a marca `(unverified)`.
 
-Quando os dicionários voltarem a funcionar, use:
-
-```bash
-python anki_words.py --allow-unverified
-```
-
-Nesse modo, o script também permite cartões sem confirmação em dicionário, marcados como `(unverified)`. O modo rápido continua usando `--no-dict`.
+As opções antigas `--no-dict` e `--allow-unverified` continuam aceitas por compatibilidade, mas não alteram o comportamento. O validador ainda reconhece `(unverified)` em CSVs antigos.
 
 Se a geração falhar, resolva o erro antes de continuar. Se aparecer `Nothing new to add`, não há cartões novos para importar.
 
@@ -396,7 +392,7 @@ python import_to_anki.py --audio-only --dry-run
 | Cartões sem áudio | Confira a conexão e tente o modo `--audio-only` mais tarde. Feche antes o Navegador do Anki. |
 | Palavras permanecem na lista | Confira as falhas no resumo. O modo manual e a opção `--keep` não limpam a entrada. |
 | CSV com campos entre aspas | Não remova as aspas automaticamente. Se houver dois significados separados por ponto e vírgula, mantenha apenas um significado. |
-| Dicionários indisponíveis | Use o modo atual com `--no-dict`. A IA gera o conteúdo sem consulta aos dicionários. |
+| Dúvida sobre significado ou IPA | Revise o conteúdo gerado pela IA; o projeto não faz verificação em dicionários. |
 
 Se o modo rápido falhar, identifique a última etapa concluída e use o modo manual para retomar a partir da etapa pendente. Não execute novamente todo o fluxo sem conferir o que já foi importado.
 
@@ -414,11 +410,10 @@ Learning Language/
 ├── check_csv.py             # Validação e correções seguras
 ├── import_to_anki.py        # Importação das notas e geração de áudio
 ├── anki_import.csv          # CSV gerado
-├── anki_import_fixed.csv    # CSV com correções seguras
-└── dict_cache.json          # Cache das consultas aos dicionários
+└── anki_import_fixed.csv    # CSV com correções seguras
 ```
 
-Os CSVs e o cache são arquivos gerados e não precisam ser versionados. Para mantê-los fora do Git, use as regras abaixo em `.gitignore`, caso ainda não estejam configuradas:
+Os CSVs são arquivos gerados e não precisam ser versionados. Um eventual `dict_cache.json` de versões anteriores não é mais usado e não foi removido por esta atualização. Para manter os arquivos gerados e esse cache legado fora do Git, use as regras abaixo em `.gitignore`, caso ainda não estejam configuradas:
 
 ```gitignore
 __pycache__/
