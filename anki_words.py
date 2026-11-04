@@ -83,6 +83,7 @@ def anki(action, **params):
 
 
 def in_anki(word):
+    """Match only the exact bold vocabulary on the Front, ignoring capitalization."""
     def normalize(value):
         value = re.sub(r"\[sound:[^\]]*\]", " ", value, flags=re.I)
         value = re.sub(r"<[^>]*>", "", value)
@@ -105,18 +106,6 @@ def in_anki(word):
                 if normalize(match.group(2)) == target:
                     return True
 
-            back = fields.get("Back", {}).get("value", "")
-            english = re.split(r"Tradução\s*:", normalize(back), maxsplit=1, flags=re.I)[0]
-            for match in re.finditer(r"\bmeaning\s*\(([^()]*)\)\s*:", english):
-                parts = [part.strip() for part in match.group(1).split(",")]
-                if len(parts) == 3 and parts[:2] == ["verb", "imperative"]:
-                    vocabulary = parts[2]
-                elif len(parts) == 2 and parts[1] in {"noun", "adjective", "adverb"}:
-                    vocabulary = parts[0]
-                else:
-                    continue
-                if vocabulary == target:
-                    return True
     return False
 
 
