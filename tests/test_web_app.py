@@ -19,6 +19,16 @@ def upload(text="stumble\ngive up\nShe *shrugged* and walked away.\n", filename=
 
 
 class UploadTests(unittest.TestCase):
+    def test_virtual_txt_from_text_input_uses_the_same_parser(self):
+        source = "stumble\nSTUMBLE\nShe *shrugged* and walked away.\ncafé\n"
+        text, result = web_app.read_upload(upload(source, filename="palavras_digitadas.txt"))
+        self.assertEqual(text, source)
+        self.assertEqual(result["filename"], "palavras_digitadas.txt")
+        self.assertEqual(result["count"], 3)
+        self.assertEqual(result["repeated"], 1)
+        self.assertEqual(result["items"][1]["word"], "shrugged")
+        self.assertEqual(result["items"][2]["word"], "café")
+
     def test_preserves_context_and_ignores_duplicates(self):
         source = "\nstumble\nStumble\nShe *shrugged* and walked away.\n"
         text, result = web_app.read_upload(upload(source))

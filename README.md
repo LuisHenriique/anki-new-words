@@ -1,6 +1,6 @@
 # Palavras em inglês para o Anki
 
-Envie um `.txt` pela página local e adicione cartões com frase B2, significado, pronúncia, tradução para português brasileiro e áudio. A página mostra as frases importadas e o resultado de cada palavra, sem popups.
+Digite ou cole suas palavras, ou envie um `.txt` pela página local, e adicione cartões com frase B2, significado, pronúncia, tradução para português brasileiro e áudio. A página mostra as frases importadas e o resultado de cada palavra, sem popups.
 
 ## Comece aqui
 
@@ -198,7 +198,12 @@ O importador usa um tipo de nota chamado **Basic**, com os campos **Front** e **
 
 ### 5. Envie as palavras
 
-Use **Baixar um arquivo de exemplo** na página ou prepare qualquer `.txt`, com um item por linha:
+Em **Suas próximas palavras**, escolha uma das duas opções:
+
+- **Digitar ou colar:** escreva sua lista na caixa de texto e clique em **Conferir palavras** para mostrar a prévia.
+- **Enviar .txt:** escolha ou arraste um arquivo com qualquer nome terminado em `.txt`. A prévia aparece após a leitura. Se precisar, use **Baixar um arquivo de exemplo**.
+
+O formato é o mesmo nas duas opções, com um item por linha:
 
 ```text
 stumble
@@ -208,12 +213,14 @@ She *shrugged* and walked away.
 
 Em frases, marque apenas a palavra ou expressão que quer aprender entre `*estrelas*`. O restante é contexto. Textos corridos não têm seleção automática de vocabulário.
 
-1. Escolha ou arraste o arquivo.
+1. Digite e confira a lista, ou escolha um arquivo `.txt`.
 2. Confira a prévia.
 3. Clique em **Gerar e adicionar ao Anki**.
 4. Aguarde e confira o relatório no final da página.
 
-Até **1 MB e 500 palavras diferentes por lote**. Prefira UTF-8; UTF-16 com BOM e Windows-1252 também são aceitos. Linhas vazias e repetições são ignoradas. Cada lote começa pelo botão, não automaticamente ao atingir uma quantidade de palavras.
+Até **1 MB e 500 palavras diferentes por lote**, nas duas opções. Para arquivos, prefira UTF-8; UTF-16 com BOM e Windows-1252 também são aceitos. Linhas vazias e repetições são ignoradas. Cada lote começa pelo botão, não automaticamente ao atingir uma quantidade de palavras.
+
+Se editar o texto após conferir, a prévia anterior é descartada e será necessário clicar novamente em **Conferir palavras**. Trocar de opção também descarta a prévia, sem misturar as listas, mas preserva o rascunho na caixa de texto. O rascunho não é salvo em armazenamento permanente do navegador; atualize a página somente depois de guardar o que precisar.
 
 ## O que acontece durante o processamento?
 
@@ -231,7 +238,7 @@ Os downloads de palavras pendentes e CSVs são opcionais: os cartões válidos j
 
 ## O que consome tokens?
 
-- Enviar o arquivo, conferir a prévia, verificar requisitos, escolher baralho, consultar o dicionário, exibir frases e atualizar a página **não fazem chamadas à IA**.
+- Digitar ou colar palavras, enviar o arquivo, conferir a prévia, verificar requisitos, escolher baralho, consultar o dicionário, exibir frases e atualizar a página **não fazem chamadas à IA**.
 - Conferir grafia e gerar/revisar cartões **usam a IA**, inclusive quando o sistema precisa tentar novamente.
 - A conferência de grafia ocorre antes da busca de duplicatas, portanto até uma palavra já existente pode consumir tokens nessa etapa.
 - Áudio usa o gTTS, não os tokens do provedor de IA.

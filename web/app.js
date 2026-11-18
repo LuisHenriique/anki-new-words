@@ -15,6 +15,11 @@ let currentJob = null;
 let setupReady = false;
 let setupInfo = null;
 let availableDecks = [];
+// Browsers may restore the radio selection on F5; keep its panel consistent.
+let inputMode = $("source-file").checked ? "file" : "text";
+let previewRevision = 0;
+$("text-input-panel").hidden = inputMode !== "text";
+$("file-input-panel").hidden = inputMode !== "file";
 
 function renderSetup(info) {
   setupInfo = info;
@@ -49,7 +54,7 @@ function renderSetup(info) {
   $("destination-deck").textContent = $("deck").value || "o baralho escolhido acima";
   $("setup-summary").textContent = setupReady
     ? "Tudo pronto para enviar suas palavras. O acesso à conta de IA será usado somente ao gerar os cartões."
-    : "Conclua os itens pendentes e escolha o baralho. Você já pode enviar o arquivo e conferir a lista.";
+    : "Conclua os itens pendentes e escolha o baralho. Você já pode digitar ou enviar suas palavras e conferir a lista.";
   updateButton();
 }
 
@@ -169,27 +174,62 @@ async function api(path, options = {}) {
 function updateButton() {
   $("import").disabled = !upload || busy || reading || !token || !setupReady;
   $("import").textContent = busy ? "Importação em andamento…" : "Gerar e adicionar ao Anki";
-  $("file").disabled = busy || reading;
+  const inputLocked = busy || reading || !token;
+  $("file").disabled = inputLocked;
+  $("typed-words").disabled = inputLocked;
+  $("source-text").disabled = inputLocked;
+  $("source-file").disabled = inputLocked;
+  $("preview-text").disabled = inputLocked || !$("typed-words").value.trim();
+  $("preview-text").textContent = reading && inputMode === "text" ? "Conferindo palavras…" : "Conferir palavras";
   $("deck").disabled = busy || !availableDecks.length;
 }
 
-async function selectFile(file) {
-  if (!file || busy || reading) return;
-  message("");
+function clearPreview() {
+  previewRevision += 1;
   upload = null;
+  $("count").textContent = "0 palavras";
+  $("words").replaceChildren();
+  $("words").hidden = true;
+  $("preview-note").hidden = true;
+  $("empty").hidden = false;
+}
+
+function selectInputMode(mode) {
+  if (busy || reading || !token || mode === inputMode) return;
+  inputMode = mode;
+  $("source-text").checked = mode === "text";
+  $("source-file").checked = mode === "file";
+  $("text-input-panel").hidden = mode !== "text";
+  $("file-input-panel").hidden = mode !== "file";
+  // Keep the typed draft in the textarea, but never reuse another mode's preview.
+  $("file").value = "";
+  $("file-label").textContent = "Escolha seu arquivo .txt";
+  clearPreview();
+  message("");
+  $("typed-status").textContent = "Confira o texto antes de gerar os cartões. Trocar de opção não mistura as listas.";
+  updateButton();
+}
+
+async function previewSource(filename, loadBytes) {
+  if (busy || reading || !token) return;
+  message("");
+  clearPreview();
+  const revision = previewRevision;
   reading = true;
   updateButton();
   try {
-    if (file.size > 1000000) throw new Error("O arquivo deve ter no máximo 1 MB.");
-    const bytes = new Uint8Array(await file.arrayBuffer());
+    const bytes = await loadBytes();
+    if (bytes.length > 1000000) throw new Error("A lista deve ter no máximo 1 MB.");
     let binary = "";
     for (let start = 0; start < bytes.length; start += 8192) {
       binary += String.fromCharCode(...bytes.subarray(start, start + 8192));
     }
-    const payload = { filename: file.name, data: btoa(binary) };
+    const payload = { filename, data: btoa(binary) };
     const preview = await (await api("/api/preview", { method: "POST", body: JSON.stringify(payload) })).json();
+    if (revision !== previewRevision) return;
     upload = payload;
-    $("file-label").textContent = preview.filename;
+    if (inputMode === "file") $("file-label").textContent = preview.filename;
+    else $("typed-status").textContent = "Lista conferida. Se editar o texto, clique em Conferir palavras novamente.";
     $("count").textContent = `${preview.count} ${preview.count === 1 ? "palavra" : "palavras"}`;
     $("empty").hidden = true;
     $("words").hidden = false;
@@ -211,17 +251,46 @@ async function selectFile(file) {
       $("words").append(li);
     }
   } catch (error) {
+    if (revision !== previewRevision) return;
     $("file-label").textContent = "Escolha seu arquivo .txt";
-    $("count").textContent = "0 palavras";
-    $("words").hidden = true;
-    $("preview-note").hidden = true;
-    $("empty").hidden = false;
+    if (inputMode === "text") $("typed-status").textContent = "A lista não foi conferida. Revise o texto e tente novamente.";
     message(error.message);
   } finally {
     reading = false;
     updateButton();
   }
 }
+
+async function previewTypedText() {
+  if (busy || reading || !token || inputMode !== "text") return;
+  const text = $("typed-words").value;
+  if (!text.trim()) {
+    clearPreview();
+    message("Digite pelo menos uma palavra, com um item por linha.");
+    updateButton();
+    return;
+  }
+  await previewSource("palavras_digitadas.txt", async () => new TextEncoder().encode(text));
+}
+
+async function selectFile(file) {
+  if (!file || busy || reading || !token) return;
+  selectInputMode("file");
+  await previewSource(file.name, async () => {
+    if (file.size > 1000000) throw new Error("O arquivo deve ter no máximo 1 MB.");
+    return new Uint8Array(await file.arrayBuffer());
+  });
+}
+
+$("source-text").addEventListener("change", () => selectInputMode("text"));
+$("source-file").addEventListener("change", () => selectInputMode("file"));
+$("preview-text").addEventListener("click", previewTypedText);
+$("typed-words").addEventListener("input", () => {
+  if (inputMode !== "text" || busy) return;
+  clearPreview();
+  $("typed-status").textContent = "Texto alterado. Clique em Conferir palavras para atualizar a lista.";
+  updateButton();
+});
 
 async function download(jobId, filename) {
   try {
@@ -356,7 +425,7 @@ async function status() {
 if (!token) {
   $("access").hidden = false;
   $("connection").textContent = "Acesso protegido";
-  $("file").disabled = true;
+  updateButton();
 } else {
   status();
   currentJob = sessionStorage.getItem("anki-job");

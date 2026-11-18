@@ -5,6 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
 const vm = require("node:vm");
+const { TextEncoder } = require("node:util");
 
 const root = path.resolve(__dirname, "..");
 const html = fs.readFileSync(path.join(root, "web/index.html"), "utf8");
@@ -19,6 +20,7 @@ class Element {
     this._text = "";
     this.className = "";
     this.value = "";
+    this.scrollCount = 0;
     this.classList = { toggle() {}, add() {}, remove() {} };
     this.listeners = {};
   }
@@ -27,7 +29,7 @@ class Element {
   append(...children) { this.children.push(...children); }
   replaceChildren(...children) { this._text = ""; this.children = children; }
   addEventListener(name, handler) { this.listeners[name] = handler; }
-  scrollIntoView() { throw new Error("Restoring a report must not scroll the page."); }
+  scrollIntoView() { this.scrollCount += 1; }
 }
 
 function fixture(overrides = {}) {
@@ -46,9 +48,14 @@ function fixture(overrides = {}) {
   };
 }
 
-function browser(storedJob = null, rememberedDeck = null) {
-  const elements = new Map([...html.matchAll(/id="([^"]+)"/g)].map((match) => [match[1], new Element("div")]));
+function browser(storedJob = null, rememberedDeck = null, responses = {}) {
+  const elements = new Map([...html.matchAll(/<[^>]*\bid="([^"]+)"[^>]*>/g)].map((match) => {
+    const element = new Element("div");
+    element.hidden = /\bhidden(?:\s|>)/.test(match[0]);
+    return [match[1], element];
+  }));
   const storage = new Map(storedJob ? [["anki-access", "test-key"], ["anki-job", storedJob.id]] : []);
+  if (responses.restoreFileMode) elements.get("source-file").checked = true;
   if (rememberedDeck) storage.set("anki-deck", rememberedDeck);
   const requests = [];
   const context = vm.createContext({
@@ -59,17 +66,44 @@ function browser(storedJob = null, rememberedDeck = null) {
     location: { hash: "", pathname: "/" }, history: { replaceState() {} },
     sessionStorage: { getItem: (key) => storage.get(key) || null,
       setItem: (key, value) => storage.set(key, value), removeItem: (key) => storage.delete(key) },
-    URL, URLSearchParams, setInterval() {}, setTimeout() {}, clearTimeout() {},
+    URL, URLSearchParams, TextEncoder,
+    btoa: (value) => Buffer.from(value, "binary").toString("base64"),
+    matchMedia: () => ({ matches: true }),
+    setInterval() {}, setTimeout() {}, clearTimeout() {},
     fetch: async (url, options = {}) => {
-      requests.push({ url, method: options.method || "GET" });
+      requests.push({ url, method: options.method || "GET", body: options.body });
+      if (url === "/api/preview" && options.method === "POST") {
+        assert.ok(responses.preview, "Unexpected preview request.");
+        const payload = JSON.parse(options.body);
+        const data = typeof responses.preview === "function" ? await responses.preview(payload) : responses.preview;
+        return { ok: !data.error, json: async () => data };
+      }
+      if (url === "/api/jobs" && options.method === "POST") {
+        assert.equal(responses.allowImport, true, "Unexpected import request.");
+        return { ok: true, json: async () => ({ id: "new-job" }) };
+      }
       assert.equal(options.method || "GET", "GET", "Refreshing must never start an import.");
       return { ok: true, json: async () => url === "/api/status"
         ? { anki: true, audio: true, opencode: true, basic: true,
-            decks: ["English Vocabulary", "Meu Inglês"], active: null, ai_auth_checked: false } : storedJob };
+            decks: ["English Vocabulary", "Meu Inglês"], active: null, ai_auth_checked: false }
+        : url.endsWith("/new-job") ? fixture({ id: "new-job" }) : storedJob };
     },
   });
   vm.runInContext(script, context);
-  return { elements, requests, setup(info) {
+  return { elements, requests, type(text) {
+    elements.get("typed-words").value = text;
+    elements.get("typed-words").listeners.input();
+  }, preview() {
+    return elements.get("preview-text").listeners.click();
+  }, choose(mode) {
+    context.testMode = mode;
+    vm.runInContext("selectInputMode(testMode)", context);
+  }, file(file) {
+    context.testFile = file;
+    return vm.runInContext("selectFile(testFile)", context);
+  }, submit() {
+    return elements.get("import").listeners.click();
+  }, setup(info) {
     context.testSetup = info;
     vm.runInContext("renderSetup(testSetup)", context);
   }, prepareUpload() {
@@ -111,6 +145,7 @@ test("F5 restores a completed report without a popup, scrolling or another impor
   assert.match(page.elements.get("report-groups").textContent, /bathtub/);
   assert.equal(page.elements.get("log-details").open, false);
   assert.deepEqual(page.requests.map((request) => request.method), ["GET", "GET"]);
+  assert.equal(page.elements.get("job").scrollCount, 0);
   assert.equal(page.elements.get("fronts-list").children.length, 2);
   assert.equal(page.elements.get("imported-fronts").hidden, false);
 });
@@ -222,4 +257,144 @@ test("generation stays disabled until every prerequisite and a destination are r
   page.setup({ anki: true, audio: true, opencode: true, basic: true, decks: ["Another deck"] });
   assert.equal(page.elements.get("deck").value, "");
   assert.equal(page.elements.get("import").disabled, true);
+});
+
+const listPreview = {
+  filename: "palavras_digitadas.txt", count: 2, repeated: 1,
+  items: [{ word: "stumble", context: "", line: 1 },
+    { word: "shrugged", context: "She *shrugged* and walked away.", line: 3 }],
+};
+
+test("typed words use the existing UTF-8 TXT preview without starting an import", async () => {
+  let sent;
+  const page = browser(fixture(), null, { preview: (payload) => { sent = payload; return listPreview; } });
+  await new Promise(setImmediate);
+  const text = "stumble\nSTUMBLE\nShe *shrugged* and walked away.\ncafé";
+  page.type(text);
+  assert.equal(page.elements.get("import").disabled, true);
+  await page.preview();
+  assert.equal(sent.filename, "palavras_digitadas.txt");
+  assert.equal(Buffer.from(sent.data, "base64").toString("utf8"), text);
+  assert.equal(page.elements.get("count").textContent, "2 palavras");
+  assert.match(page.elements.get("preview-note").textContent, /1 repetições/);
+  assert.match(page.elements.get("words").textContent, /shrugged/);
+  assert.equal(page.elements.get("import").disabled, false);
+  assert.equal(page.requests.filter((request) => request.method === "POST").length, 1);
+  assert.equal(page.requests.at(-1).url, "/api/preview");
+});
+
+test("editing a typed draft invalidates the previous preview and blocks stale imports", async () => {
+  const page = browser(fixture(), null, { preview: listPreview });
+  await new Promise(setImmediate);
+  page.type("stumble");
+  await page.preview();
+  assert.equal(page.elements.get("import").disabled, false);
+  page.type("bathtub");
+  assert.equal(page.elements.get("import").disabled, true);
+  assert.equal(page.elements.get("words").hidden, true);
+  assert.equal(page.elements.get("count").textContent, "0 palavras");
+  await page.submit();
+  assert.equal(page.requests.filter((request) => request.url === "/api/jobs").length, 0);
+});
+
+test("switching input modes preserves the draft but never mixes previews", async () => {
+  const page = browser(fixture(), null, { preview: listPreview });
+  await new Promise(setImmediate);
+  page.type("stumble");
+  await page.preview();
+  page.choose("file");
+  assert.equal(page.elements.get("text-input-panel").hidden, true);
+  assert.equal(page.elements.get("file-input-panel").hidden, false);
+  assert.equal(page.elements.get("import").disabled, true);
+  assert.equal(page.elements.get("typed-words").value, "stumble");
+  page.choose("text");
+  assert.equal(page.elements.get("file-input-panel").hidden, true);
+  assert.equal(page.elements.get("typed-words").value, "stumble");
+  assert.equal(page.elements.get("import").disabled, true);
+});
+
+test("TXT uploads still use the same shared preview and preserve source bytes", async () => {
+  let sent;
+  const page = browser(fixture(), null, { preview: (payload) => { sent = payload; return { ...listPreview, filename: "lista.txt" }; } });
+  await new Promise(setImmediate);
+  page.choose("file");
+  const bytes = new TextEncoder().encode("stumble\nShe *shrugged* and walked away.");
+  await page.file({ name: "lista.txt", size: bytes.length, arrayBuffer: async () => bytes.buffer });
+  assert.equal(sent.filename, "lista.txt");
+  assert.equal(Buffer.from(sent.data, "base64").toString("utf8"), "stumble\nShe *shrugged* and walked away.");
+  assert.equal(page.elements.get("file-label").textContent, "lista.txt");
+  assert.equal(page.elements.get("import").disabled, false);
+});
+
+test("blank or oversized UTF-8 text is refused before any preview request", async () => {
+  const page = browser(fixture());
+  await new Promise(setImmediate);
+  page.type(" \n\t ");
+  await page.preview();
+  assert.match(page.elements.get("message").textContent, /Digite pelo menos/);
+  // Less than a million characters, but over 1 MB when encoded as UTF-8.
+  page.type("á".repeat(500001));
+  await page.preview();
+  assert.match(page.elements.get("message").textContent, /máximo 1 MB/);
+  assert.equal(page.requests.filter((request) => request.method === "POST").length, 0);
+});
+
+test("backend validation errors leave the draft editable and never enable importing", async () => {
+  const page = browser(fixture(), null, { preview: { error: "Envie até 500 palavras diferentes por vez." } });
+  await new Promise(setImmediate);
+  page.type("a long list");
+  await page.preview();
+  assert.match(page.elements.get("message").textContent, /500 palavras/);
+  assert.equal(page.elements.get("typed-words").disabled, false);
+  assert.equal(page.elements.get("typed-words").value, "a long list");
+  assert.equal(page.elements.get("import").disabled, true);
+});
+
+test("input controls are locked during an active batch", async () => {
+  const page = browser(fixture());
+  await new Promise(setImmediate);
+  page.render(fixture({ state: "running", summary: {} }));
+  for (const id of ["typed-words", "file", "source-text", "source-file", "preview-text"]) {
+    assert.equal(page.elements.get(id).disabled, true, id);
+  }
+  await page.preview();
+  assert.equal(page.requests.filter((request) => request.method === "POST").length, 0);
+});
+
+test("an outdated asynchronous preview cannot restore a draft that has changed", async () => {
+  let resolvePreview;
+  const pending = new Promise((resolve) => { resolvePreview = resolve; });
+  const page = browser(fixture(), null, { preview: () => pending });
+  await new Promise(setImmediate);
+  page.type("stumble");
+  const preview = page.preview();
+  await new Promise(setImmediate);
+  page.type("bathtub");
+  resolvePreview(listPreview);
+  await preview;
+  assert.equal(page.elements.get("import").disabled, true);
+  assert.equal(page.elements.get("count").textContent, "0 palavras");
+});
+
+test("only the checked typed payload and chosen deck are sent on explicit import", async () => {
+  const page = browser(fixture(), null, { preview: listPreview, allowImport: true });
+  await new Promise(setImmediate);
+  page.type("stumble\nShe *shrugged* and walked away.");
+  await page.preview();
+  page.elements.get("deck").value = "Meu Inglês";
+  page.elements.get("deck").listeners.change();
+  await page.submit();
+  const submitted = JSON.parse(page.requests.find((request) => request.url === "/api/jobs").body);
+  assert.equal(submitted.filename, "palavras_digitadas.txt");
+  assert.equal(submitted.deck, "Meu Inglês");
+  assert.equal(Buffer.from(submitted.data, "base64").toString("utf8"), "stumble\nShe *shrugged* and walked away.");
+  assert.equal(page.elements.get("job").scrollCount, 1);
+});
+
+test("a browser-restored file selection shows the correct panel without importing", () => {
+  const page = browser(null, null, { restoreFileMode: true });
+  assert.equal(page.elements.get("text-input-panel").hidden, true);
+  assert.equal(page.elements.get("file-input-panel").hidden, false);
+  assert.equal(page.elements.get("import").disabled, true);
+  assert.equal(page.requests.length, 0);
 });
