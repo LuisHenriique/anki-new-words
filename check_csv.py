@@ -15,6 +15,7 @@ Levels:
 """
 
 import csv
+import html
 import re
 import sys
 from pathlib import Path
@@ -25,10 +26,12 @@ CHECK_ANKI = "--anki" in sys.argv
 INPUT = Path(ARGS[0] if ARGS else "anki_import.csv")
 FIXED = INPUT.with_name(INPUT.stem + "_fixed.csv")
 
-POS = ("noun", "verb", "adjective", "adverb")
+POS = ("noun", "verb", "adjective", "adverb", "phrasal verb", "idiom")
 MEANING_RE = re.compile(r"^Meaning \((.+?), (\w+)\): (.*)$")
-# New verb format: Meaning (verb, imperative, base_form): definition!
-VERB_MEANING_RE = re.compile(r"^Meaning \(verb, imperative, (.+?)\): (.*)$")
+# One-line format for ordinary verbs and phrasal verbs.
+VERB_MEANING_RE = re.compile(
+    r"^Meaning \((?P<pos>verb|phrasal verb), imperative, (?P<base>.+?)\): (?P<meaning>.*)$"
+)
 IMPERATIVE_RE = re.compile(r"^Meaning \(imperative form of the verb\): (\S.*)!$")
 JUNK_RE = re.compile(r"\b(undefined|null|None|NaN)\b|```|\[\{|\}\]")
 
@@ -52,9 +55,9 @@ def auto_fix(row):
         else:
             vm = VERB_MEANING_RE.match(parts[0])
             label = (
-                f"Meaning (verb, imperative, {vm.group(1)})" if vm else ""
+                f"Meaning ({vm.group('pos')}, imperative, {vm.group('base')})" if vm else ""
             )
-            text = vm.group(2) if vm else ""
+            text = vm.group("meaning") if vm else ""
         if label:
             text = re.sub(r"\s*\(informal\)\s*", " ", text).strip()
             parts[0] = f"{label}: (informal) {text}"
@@ -62,6 +65,13 @@ def auto_fix(row):
 
 
 # ---------------------------------------------------------------- tests
+def sentence_word_count(front):
+    """Count visible sentence words, excluding HTML and Anki audio references."""
+    text = re.sub(r"\[sound:[^\]]*\]", "", front, flags=re.I)
+    text = html.unescape(re.sub(r"<[^>]+>", "", text))
+    return len(text.split())
+
+
 def check_row(row):
     """Return (target_word, [(level, message), ...])."""
     problems = []
@@ -79,7 +89,7 @@ def check_row(row):
     m = VERB_MEANING_RE.match(parts[0])
     if m:
         new_verb = True
-        target, pos, meaning = m.group(1).strip(), "verb", m.group(2)
+        target, pos, meaning = m.group("base").strip(), m.group("pos"), m.group("meaning")
         if not re.match(r"^[A-Za-z][A-Za-z' -]*$", target):
             add("ERROR", f"base form in the verb label looks wrong: '{target}'")
     else:
@@ -88,7 +98,8 @@ def check_row(row):
             add(
                 "ERROR",
                 "first line of the back must be: Meaning (word, part of speech): ... "
-                "or, for verbs: Meaning (verb, imperative, base_form): ...",
+                "or, for verbs: Meaning (verb, imperative, base_form): ... "
+                "or Meaning (phrasal verb, imperative, base_form): ...",
             )
             pos, meaning = "", ""
         else:
@@ -96,7 +107,7 @@ def check_row(row):
             if pos not in POS:
                 add(
                     "ERROR",
-                    f"part of speech '{pos}' must be noun, verb, adjective or adverb",
+                    f"part of speech '{pos}' must be one of: {', '.join(POS)}",
                 )
     if m:
         body = re.sub(r"\((informal|unverified)\)", "", meaning, flags=re.I).strip()
@@ -175,11 +186,14 @@ def check_row(row):
                     f"bold word '{bolds[0]}' is different from the card word '{target}'",
                 )
     plain = re.sub(r"<[^>]+>", "", front).strip()
-    n_words = len(plain.split())
-    if n_words < 4:
-        add("WARNING", f"very short sentence ({n_words} words)")
-    elif n_words > 25:
-        add("WARNING", f"very long sentence ({n_words} words)")
+    n_words = sentence_word_count(front)
+    if n_words < 5:
+        add("ERROR", f"sentence has {n_words} words; at least 5 are required")
+    elif n_words > 15:
+        add(
+            "WARNING",
+            f"sentence has {n_words} words; exceed 15 only when extra context is genuinely necessary",
+        )
     if plain and not re.search(r"[.!?\"”']$", plain):
         add("WARNING", "the sentence does not end with . ! or ?")
     if "<" in plain or ">" in plain:
@@ -242,6 +256,21 @@ def main():
             print(f"Line {n:>3} | {target:<18} | {level:<7} | {msg}")
             errors += level == "ERROR"
             warnings += level == "WARNING"
+    lengths = [sentence_word_count(row[0]) for row in rows if len(row) == 2]
+    if lengths:
+        preferred = sum(6 <= length <= 10 for length in lengths)
+        print(
+            f"\nSentence length: {preferred}/{len(lengths)} ({preferred / len(lengths):.0%}) "
+            "within the preferred 6-10-word range; "
+            f"{sum(length < 5 for length in lengths)} below 5; "
+            f"{sum(length > 15 for length in lengths)} above 15."
+        )
+        if preferred * 2 <= len(lengths):
+            warnings += 1
+            print(
+                "WARNING | sentence-length distribution: most sentences must have 6-10 words "
+                "(more than 50%); review the examples before importing."
+            )
     bad_lines = sum(1 for _, _, p in results if any(l == "ERROR" for l, _ in p))
     print(
         f"\n{len(rows)} cards checked: {errors} error(s) on {bad_lines} line(s), {warnings} warning(s)."

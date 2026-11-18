@@ -51,6 +51,64 @@ class UploadTests(unittest.TestCase):
 
 
 class PipelineTests(unittest.TestCase):
+    def outcome_output(self, cards, extra="", skipped=None, not_generated=None):
+        dictionary = {"cards": cards, "not_generated": not_generated or [],
+                      "meaning_checked": 0, "ipa_checked": 0, "sources": [], "ai_completed": []}
+        output = "DICTIONARY_SUMMARY: " + json.dumps(dictionary) + "\n"
+        if skipped is not None:
+            output += "VOCABULARY_SKIPPED: " + json.dumps(skipped) + "\n"
+        return output + extra
+
+    def test_outcome_separates_confirmed_imports_ai_fallback_and_skipped(self):
+        cards = [{"word": "bathtub", "row": 1, "ai_completed": []},
+                 {"word": "messed up", "row": 2, "ai_completed": ["pronunciation"]}]
+        output = self.outcome_output(cards, "Done! 2 note(s) added to 'English Vocabulary' (tag: import-20261118)\n",
+                                     skipped=["adamant"])
+        outcome = web_app.summarize(output)["outcome"]
+        self.assertEqual(outcome["imported"], ["bathtub"])
+        self.assertEqual(outcome["imported_ai"], [{"word": "messed up", "parts": ["pronunciation"]}])
+        self.assertEqual(outcome["skipped"], ["adamant"])
+        self.assertEqual(outcome["failed"], [])
+        self.assertEqual(outcome["unconfirmed"], [])
+
+    def test_refused_unverified_card_is_not_reported_as_imported(self):
+        cards = [{"word": "bathtub", "row": 1, "ai_completed": []},
+                 {"word": "enlarged", "row": 2, "ai_completed": ["meaning"]}]
+        output = self.outcome_output(cards,
+            "Not imported | line 2 | enlarge | sentence too short\n"
+            "Done! 1 note(s) added to 'English Vocabulary' (tag: import-20261118)\n")
+        outcome = web_app.summarize(output)["outcome"]
+        self.assertEqual(outcome["imported"], ["bathtub"])
+        self.assertEqual(outcome["imported_ai"], [])
+        self.assertEqual(outcome["failed"], [{"word": "enlarged", "reason": "sentence too short"}])
+
+    def test_anki_rejection_is_separate_from_preexisting_skipped_words(self):
+        cards = [{"word": "bathtub", "row": 1, "ai_completed": []}]
+        output = self.outcome_output(cards,
+            "Not added (Anki says duplicate or invalid) | line 1 | bathtub\n"
+            "Done! 0 note(s) added to 'English Vocabulary' (tag: import-20261118)\n")
+        outcome = web_app.summarize(output)["outcome"]
+        self.assertEqual(outcome["imported"], [])
+        self.assertEqual(outcome["skipped"], [])
+        self.assertEqual(outcome["failed"][0]["word"], "bathtub")
+
+    def test_generation_is_not_mistaken_for_successful_import(self):
+        cards = [{"word": "bathtub", "row": 1, "ai_completed": []},
+                 {"word": "adamant", "row": 2, "ai_completed": ["meaning"]}]
+        for ending in ("Done! 2 cards saved\nThe import did not finish\n",
+                       "Done! 1 note(s) added to 'English Vocabulary' (tag: import-20261118)\n"):
+            outcome = web_app.summarize(self.outcome_output(cards, ending))["outcome"]
+            self.assertEqual(outcome["imported"], [])
+            self.assertEqual(outcome["imported_ai"], [])
+            self.assertEqual(outcome["unconfirmed"], ["bathtub", "adamant"])
+
+    def test_all_skipped_and_missing_cards_are_reported(self):
+        outcome = web_app.summarize('VOCABULARY_SKIPPED: ["bathtub", "adamant"]\nNothing new to add\n')["outcome"]
+        self.assertEqual(outcome["skipped"], ["bathtub", "adamant"])
+        self.assertTrue(outcome["available"])
+        outcome = web_app.summarize(self.outcome_output([], not_generated=["hit the books"]))["outcome"]
+        self.assertEqual(outcome["failed"][0]["word"], "hit the books")
+
     def test_execution_is_isolated_and_failed_import_is_not_success(self):
         with tempfile.TemporaryDirectory() as temporary:
             app = web_app.App("secret", temporary)

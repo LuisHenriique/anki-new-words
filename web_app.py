@@ -93,12 +93,58 @@ def summarize(output):
         match = re.search(pattern, output)
         return match.group(1) if match else None
 
+    dictionary, skipped = None, []
+    for line in output.splitlines():
+        if line.startswith("DICTIONARY_SUMMARY: "):
+            try:
+                candidate = json.loads(line.removeprefix("DICTIONARY_SUMMARY: "))
+                if isinstance(candidate, dict):
+                    dictionary = candidate
+            except ValueError:
+                pass
+        elif line.startswith("VOCABULARY_SKIPPED: "):
+            try:
+                candidate = json.loads(line.removeprefix("VOCABULARY_SKIPPED: "))
+                if isinstance(candidate, list):
+                    skipped = [word for word in candidate if isinstance(word, str)]
+            except ValueError:
+                pass
+    failed_rows = {}
+    for number, word, error in re.findall(r"Not imported \| line (\d+) \| (.+?) \| ([^\n]+)", output):
+        failed_rows[int(number)] = error.strip()
+    for number, word in re.findall(r"Not added \(Anki says duplicate or invalid\) \| line (\d+) \| ([^\n]+)", output):
+        failed_rows[int(number)] = "O Anki recusou o cartão como duplicado ou inválido."
+    imported, imported_ai, failed, unconfirmed = [], [], [], []
+    cards = dictionary.get("cards", []) if dictionary else []
+    accepted = [card for card in cards if card.get("row") not in failed_rows]
+    added = find(r"Done! (\d+) note\(s\) added")
+    # Infer per-word success only when every CSV row is accounted for and the
+    # importer's confirmed count matches. Never mistake a generated card for an import.
+    confirmed = added is not None and int(added) == len(accepted)
+    for card in cards:
+        word = card["word"]
+        if card.get("row") in failed_rows:
+            failed.append({"word": word, "reason": failed_rows[card["row"]]})
+        elif confirmed:
+            if card.get("ai_completed"):
+                imported_ai.append({"word": word, "parts": card["ai_completed"]})
+            else:
+                imported.append(word)
+        else:
+            unconfirmed.append(word)
+    if dictionary:
+        failed.extend({"word": word, "reason": "A IA não gerou um cartão para esta palavra."}
+                      for word in dictionary.get("not_generated", []))
     return {
-        "added": find(r"Done! (\d+) note\(s\) added"),
+        "added": added,
         "audio": find(r"Audio added to (\d+) of \d+"),
         "audio_total": find(r"Audio added to \d+ of (\d+)"),
         "tag": find(r"Done! \d+ note\(s\) added to '[^']+' \(tag: ([^)]+)\)"),
         "nothing_new": "Nothing new to add" in output,
+        "dictionary": dictionary,
+        "outcome": {"imported": imported, "imported_ai": imported_ai,
+                    "skipped": skipped, "failed": failed, "unconfirmed": unconfirmed,
+                    "available": bool(cards or skipped or (dictionary and dictionary.get("not_generated")))},
         "warnings": [line for line in output.splitlines()
                      if re.search(r"WARNING|ERROR|Not imported|Warning:|Spelling fixed:|Already in Anki|unverified", line)],
     }
@@ -283,7 +329,7 @@ def local_ip():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--host", default="0.0.0.0")
+    parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8080)
     args = parser.parse_args()
     missing = [name for name in SCRIPTS if not (ROOT / name).is_file()]

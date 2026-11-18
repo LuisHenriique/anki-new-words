@@ -7,3 +7,29 @@ anki_import.csv
 anki_import_fixed.csv
 dict_cache.json
 Project_Step_by_Step.docx
+
+# Private vocabulary input (keep the local file, not its contents in Git)
+/words.txt
+
+# Local environments and secrets
+.env
+.env.*
+.venv/
+venv/
+env/
+credentials.json
+secrets.json
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_ed25519
+id_ecdsa
+id_dsa
+
+# Local logs and Anki collections or exports
+*.log
+*.anki2
+*.apkg
+*.colpkg

@@ -12,6 +12,83 @@ let busy = false;
 let reading = false;
 let timer = null;
 let currentJob = null;
+function renderImportReport(job) {
+  const summary = job.summary;
+  const outcome = job.summary.outcome;
+  const detailed = Boolean(outcome?.available);
+  const confirmed = detailed ? outcome.imported.length + outcome.imported_ai.length : null;
+  $("report-description").textContent = summary.nothing_new
+    ? "Essas palavras já estão no Anki. Nenhum cartão novo foi criado."
+    : job.state === "failed"
+      ? "O lote precisa de atenção. Confira abaixo o que foi confirmado antes de tentar novamente."
+      : "Processamento concluído. Confira o resultado das suas palavras abaixo.";
+  $("report-totals").replaceChildren();
+  const totals = [
+    { label: "Adicionadas ao Anki", value: summary.added ?? confirmed ?? "—" },
+    { label: "Já estavam no Anki", value: detailed ? outcome.skipped.length : "—" },
+    { label: "Completadas pela IA", value: detailed ? outcome.imported_ai.length : "—" },
+  ];
+  for (const total of totals) {
+    const item = document.createElement("div");
+    const label = document.createElement("dt");
+    label.textContent = total.label;
+    const value = document.createElement("dd");
+    value.textContent = total.value;
+    item.append(label, value);
+    $("report-totals").append(item);
+  }
+  $("report-groups").replaceChildren();
+  if (detailed) {
+    const groups = [
+      { title: "Importadas com dados do dicionário", items: outcome.imported, kind: "imported",
+        description: "Significado e pronúncia têm referência no dicionário. A frase e a tradução foram criadas pela IA." },
+      { title: "Já estavam no Anki", items: outcome.skipped, kind: "skipped",
+        description: "Não foram adicionadas de novo, para evitar repetições." },
+      { title: "Importadas com ajuda da IA", items: outcome.imported_ai, kind: "ai",
+        description: "Conferência incompleta no dicionário (unverified). A IA completou os dados indicados abaixo; revise esses cartões." },
+      { title: "Não foram importadas", items: outcome.failed, kind: "failed",
+        description: "Confira o motivo antes de tentar novamente." },
+      { title: "Importação não confirmada", items: outcome.unconfirmed, kind: "failed",
+        description: "O processo não confirmou o resultado destas palavras. Confira o Anki antes de repetir." },
+    ];
+    for (const group of groups) {
+      if (!group.items.length && group.kind === "failed") continue;
+      const section = document.createElement("section");
+      section.className = `outcome-group ${group.kind}`;
+      const heading = document.createElement("div");
+      heading.className = "outcome-heading";
+      const title = document.createElement("h3");
+      title.textContent = group.title;
+      const count = document.createElement("span");
+      count.className = "outcome-count";
+      count.textContent = group.items.length;
+      heading.append(title, count);
+      const description = document.createElement("p");
+      description.textContent = group.items.length ? group.description : "Nenhuma palavra nesta situação.";
+      const list = document.createElement("ul");
+      for (const item of group.items) {
+        const li = document.createElement("li");
+        li.textContent = typeof item === "string" ? item : item.word;
+        if (typeof item !== "string") {
+          const detail = document.createElement("small");
+          detail.textContent = item.reason || `Completado pela IA: ${item.parts.map((part) => part === "meaning" ? "significado" : "pronúncia").join(" e ")}.`;
+          li.append(detail);
+        }
+        list.append(li);
+      }
+      section.append(heading, description);
+      if (group.items.length) section.append(list);
+      $("report-groups").append(section);
+    }
+  }
+  $("report-note").textContent = detailed
+    ? "A indicação unverified fica somente neste relatório, não nos novos cartões do Anki. Os cartões com ajuda da IA já estão incluídos no total de adicionadas."
+    : "Este lote não tem o resultado detalhado por palavra. Consulte os detalhes técnicos abaixo; não é possível afirmar quais dados foram conferidos no dicionário.";
+  if (summary.audio != null) $("report-note").textContent += ` Áudio gerado para ${summary.audio} frases.`;
+  if (summary.audio != null && Number(summary.audio) < Number(summary.audio_total)) {
+    $("report-note").textContent += " Algumas frases ficaram sem áudio. Para tentar depois, use no computador: python import_to_anki.py --audio-only";
+  }
+}
 
 function message(text) {
   $("message").textContent = text || "";
@@ -103,7 +180,7 @@ async function download(jobId, filename) {
 function renderJob(job) {
   busy = job.state === "running";
   $("job").hidden = false;
-  $("job-title").textContent = job.phase;
+  $("job-title").textContent = busy ? job.phase : "Resultado da importação";
   $("job-subtitle").textContent = `${job.filename} · ${job.count} palavras`;
   $("job-state").textContent = busy ? "Em andamento" : job.state === "completed" ? "Concluído" : "Atenção";
   $("job-state").className = `job-state ${busy ? "" : job.state === "completed" ? "done" : "failed"}`;
@@ -114,33 +191,37 @@ function renderJob(job) {
     : job.state === "completed"
       ? "Confira o relatório. Você pode baixar as palavras que ficaram pendentes."
       : "Confira o erro no relatório. O arquivo original está preservado. Se houve importação parcial, não repita sem conferir o Anki.";
-  $("result").hidden = busy || job.state !== "completed";
-  $("result").replaceChildren();
-  if (!busy && job.state === "completed") {
-    const summary = job.summary;
-    const lines = summary.nothing_new ? ["Todas as palavras já estão no Anki. Nenhum cartão novo foi criado."] : [
-      `${summary.added ?? "Confira o relatório para saber quantos"} cartões adicionados.`,
-      `Com áudio: ${summary.audio ?? "consulte o relatório"}.`,
-      ...(summary.tag ? [`Lote: ${summary.tag}`] : []),
-      ...(summary.audio !== null && Number(summary.audio) < Number(summary.audio_total)
-        ? ["Alguns cartões ficaram sem áudio. Para tentar depois, use no computador: python import_to_anki.py --audio-only"] : []),
-      "Cartões escritos pela IA de memória, sem consulta a dicionários.",
-      "Confira possíveis recusas e avisos no relatório completo.",
-    ];
-    for (const line of lines) {
-      const p = document.createElement("p");
-      p.textContent = line;
-      $("result").append(p);
-    }
+  $("result").hidden = busy;
+  if (!busy) renderImportReport(job);
+  const sources = job.summary.dictionary?.sources || [];
+  $("dictionary-sources").hidden = sources.length === 0;
+  $("source-links").replaceChildren();
+  for (const source of sources) {
+    let url;
+    try { url = new URL(source.url); } catch { continue; }
+    if (url.protocol !== "https:" || url.host !== "en.wiktionary.org" || !url.pathname.startsWith("/wiki/")) continue;
+    const li = document.createElement("li");
+    const link = document.createElement("a");
+    link.href = url.href;
+    link.textContent = source.word;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    li.append(link);
+    $("source-links").append(li);
   }
   $("downloads").replaceChildren();
+  if (job.downloads.length) {
+    const note = document.createElement("p");
+    note.className = "download-note";
+    note.textContent = "Caso queira, baixe os arquivos abaixo.";
+    $("downloads").append(note);
+  }
   for (const name of job.downloads) {
     const button = document.createElement("button");
     button.textContent = name === "uploaded_words.txt" ? "Baixar palavras pendentes" : `Baixar ${name}`;
     button.addEventListener("click", () => download(job.id, name));
     $("downloads").append(button);
   }
-  if (!busy && job.state === "failed") $("log-details").open = true;
   updateButton();
 }
 

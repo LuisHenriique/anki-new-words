@@ -61,11 +61,22 @@ She *shrugged* and walked away.</pre>
       <div class="job-heading"><div><h2 id="job-title">Preparando seu lote</h2><p id="job-subtitle"></p></div><span id="job-state" class="job-state">Em andamento</span></div>
       <div id="progress" class="progress" role="progressbar" aria-label="Processamento em andamento"><span></span></div>
       <p id="job-hint">Você pode acompanhar abaixo. Mantenha o servidor no computador ligado.</p>
-      <div id="result" class="result" hidden></div>
+      <section id="result" class="result" aria-labelledby="report-title" hidden>
+        <h3 id="report-title">Resumo do lote</h3>
+        <p id="report-description" class="report-description" role="status"></p>
+        <dl id="report-totals" class="report-totals"></dl>
+        <div id="report-groups" class="report-groups"></div>
+        <p id="report-note" class="report-note"></p>
+      </section>
       <div id="downloads" class="downloads"></div>
-      <details id="log-details"><summary>Ver relatório completo e mensagens do processo</summary><pre id="log" tabindex="0"></pre></details>
+      <details id="dictionary-sources" hidden>
+        <summary>Fontes consultadas no dicionário</summary>
+        <p>Dados de <a href="https://freedictionaryapi.com/" target="_blank" rel="noopener noreferrer">FreeDictionaryAPI.com</a>, a partir do Wiktionary, sob a licença <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener noreferrer">CC BY-SA 4.0</a>. As definições são simplificadas pela IA; as frases e traduções também são geradas por ela.</p>
+        <ul id="source-links"></ul>
+      </details>
+      <details id="log-details" class="technical-details"><summary>Ver detalhes técnicos do processamento</summary><p>Mensagens originais dos scripts, para consultar avisos ou investigar um problema.</p><pre id="log" tabindex="0"></pre></details>
     </section>
   </main>
-  <footer><span>Aprender inglês, uma palavra de cada vez.</span><span>Executado no seu computador · AnkiConnect</span></footer>
+  <footer><span>Aprender inglês, uma palavra de cada vez.<br>Dicionário: <a href="https://freedictionaryapi.com/" target="_blank" rel="noopener noreferrer">FreeDictionaryAPI.com</a> / <a href="https://en.wiktionary.org/" target="_blank" rel="noopener noreferrer">Wiktionary</a> (<a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener noreferrer">CC BY-SA 4.0</a>).</span><span>Executado no seu computador · AnkiConnect</span></footer>
 </body>
 </html>

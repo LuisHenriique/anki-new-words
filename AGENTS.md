@@ -2,6 +2,7 @@
 
 ## File modification and permission policy (highest priority)
 
+- **Before taking any action, always consult the current `AGENTS.md` and follow its instructions. Do not rely only on a previously loaded copy.**
 - **Never rewrite, edit, overwrite, reformat, reorganize, truncate, or otherwise modify any existing project file unless I explicitly authorize that specific change.**
 - This rule applies to `AGENTS.md` itself, source code, scripts, configuration files, data files, CSVs, caches, documentation, and every other project file.
 - Suggestions, requests to inspect/debug/explain/review, requests to run a command, or requests to fix a problem do **not** by themselves authorize editing files. First explain the proposed change and ask for permission.
@@ -83,13 +84,19 @@ Before delivering a deck, verify each card:
 - `Meaning (word, part of speech): short and simple English definition`
   - Give exactly ONE meaning. Never put a second definition after a `;` or a comma: it reads as two cards' worth of meaning and forces the CSV to quote the line.
   - If the word has several senses, keep only the one that fits the context phrase (or the most common one when there is no context).
-- Part of speech must be one of: noun, verb, adjective, adverb.
+- Part of speech must be one of: noun, verb, adjective, adverb, phrasal verb, idiom.
 - If the word is informal or slang, put `(informal)` before the meaning.
-- For verbs, write exactly ONE Meaning line in this shape: `Meaning (verb, imperative, base_form): definition`
+- For ordinary verbs, write exactly ONE Meaning line in this shape: `Meaning (verb, imperative, base_form): definition`
   - `base_form` is the dictionary form: `nod` for `nodded`, `cling` for `cling`.
   - Write the definition normally, with no forced final punctuation. Example: `Meaning (verb, imperative, nod): to move your head up and down to show agreement`
   - Never add a second line like `Meaning (imperative form of the verb): nod!`.
-  - This applies to every verb, regular or irregular, whatever tense or form appears on the Front.
+  - This applies to every ordinary verb, regular or irregular, whatever tense or form appears on the Front.
+- For phrasal verbs, write exactly ONE Meaning line in this shape: `Meaning (phrasal verb, imperative, base_form): definition`.
+  - Include the complete phrasal verb in the base form: `give up` for `gave up`.
+  - Keep the actual target form in bold on the Front. Do not add a second imperative line.
+- For idioms, use `Meaning (expression, idiom): definition`, for example `Meaning (break the ice, idiom): to make people feel more comfortable together`.
+  - Label established phrasal verbs as `phrasal verb`, even when their meaning is idiomatic. Use `idiom` for other established figurative expressions.
+  - Do not label an expression as an idiom or phrasal verb merely because it has multiple words. For example, `be flanked by` is an ordinary passive verb construction.
 - For nouns, adjectives and adverbs keep `Meaning (word, part of speech): definition`.
 - `Phonetic: /IPA/`
 - `Tradução:` Brazilian Portuguese, one to three options separated by commas, from the most common to the least common.
@@ -109,19 +116,19 @@ Before delivering a deck, verify each card:
 
 ## Sources (avoid hallucination)
 
-- Use only English dictionaries as sources for meaning, part of speech, pronunciation (IPA), and informal labels. Preferred order:
-  1. Cambridge Dictionary (dictionary.cambridge.org)
-  2. Oxford Learner's Dictionaries
-  3. Merriam-Webster Learner's Dictionary
-  4. Longman or Collins
-- Do not use memory, blogs, forums, or AI-written sites for definitions or IPA.
+- Use FreeDictionaryAPI.com as the dictionary source for meaning, part of speech, pronunciation (IPA), and informal labels: `https://freedictionaryapi.com/api/v1/entries/en/<word>`. Its data comes from the English Wiktionary. Do not confuse it with dictionaryapi.dev.
+- Consult the corrected target word or expression. When needed, also consult its dictionary/base form, preserving the complete expression (for example `mess up` for `messed up`). Keep the original target form on the Front and never substitute the base form's IPA for the pronunciation of an inflected target.
+- Use dictionary data when available. Do not use blogs, forums, or AI-written sites as dictionary sources. The AI may complete missing data only as the fallback described below.
 - Write the definition in simple words, based on the dictionary entry. Do not copy it word by word.
 - Choose the dictionary meaning that fits the context phrase (the text around the `*word*`). If there is no context, use the most common meaning.
 - Example sentences must be natural B2 English that show the same meaning as the dictionary entry. If the dictionary has a good example, use it as a model, but write a new sentence.
-- The `informal` label comes from the dictionary label (for example "informal" or "slang"). Do not guess it.
-- If a word cannot be checked in a dictionary (not found, or no access), STILL make a card for it. Do not skip it and do not ask me.
-  - Put `(unverified)` before the meaning on the back of that card, so I know to check it.
-  - List all unverified words in the final message under "Not verified". That is the only place where I want to be told about them.
+- When a dictionary sense is used, take the `informal` label from its labels (for example "informal", "slang", or "colloquial").
+- If a word or expression cannot be found, the API is unavailable or rate-limited, no returned sense fits the context, or any required data such as IPA is missing, STILL make the card. The AI completes the missing data using the existing generation process; do not skip the word or ask me. Preserve usable dictionary data rather than replacing it unnecessarily.
+  - Track separately whether the meaning and target pronunciation have dictionary support. Finding a word does not verify the entire card: sentences and translations are still generated by the AI.
+  - Report words with AI-completed meaning or pronunciation as "Not verified" / "unverified", identifying which data was completed by the AI.
+  - **Verification labels belong only in the report integrated at the bottom of the website page, never in a popup. Never add `(unverified)` or another verification marker to the Front, Back, or other Anki note fields.** Do not modify existing notes to remove old labels without my explicit authorization.
+- Keep dictionary attribution only in the website interface: credit FreeDictionaryAPI.com and Wiktionary, show the applicable license and links to the original consulted Wiktionary entries. Do not add attribution, source names, or source links to the cards.
+- After a website import finishes, display a clear, visually organized report integrated at the bottom of the page. Do not use popups or modal dialogs, including when restoring a previous result after a page refresh (F5). Separately list words imported with dictionary-supported data, words already in Anki, words actually imported with AI-completed data (unverified), and failures or unconfirmed imports. Keep technical messages collapsed by default. Do not report a card as imported merely because it was generated; use the import results.
 
 ## Rules for the agent
 
@@ -142,9 +149,9 @@ When I say "add new words" (or "add the new words", "run it", "make the cards"),
 
 1. **Make the cards.** Run in the project folder:
    ```bash
-   python anki_words.py --no-dict
+   python anki_words.py
    ```
-   Use `python anki_words.py other.txt --no-dict` if I name another file. The dictionaries are not working, so in this mode the AI fixes the spelling and writes the meaning, IPA, B2 sentence and translation. The cards do NOT get `(unverified)`. When I say the dictionaries work again, use `python anki_words.py --allow-unverified` instead.
+   Use `python anki_words.py other.txt` if I name another file. The script fixes spelling, checks Anki for duplicates, consults FreeDictionaryAPI.com, and asks the AI to generate the cards using the available references and complete missing data. Verification status appears only in the report/interface, never on the cards. Legacy `--no-dict` and `--allow-unverified` flags are accepted for compatibility but do not change this behavior.
    Do not make cards by hand. If the script says "Nothing new to add", stop and tell me. If it fails, stop, show me the full error and suggest a fix (do not change `anki_words.py` without my permission).
 2. **Test and fix the CSV.** Run:
    ```bash
@@ -159,7 +166,7 @@ When I say "add new words" (or "add the new words", "run it", "make the cards"),
 4. **Final report.** Show me one short report with:
    - **Spelling fixed**, for example `acquaintence -> acquaintance`
    - **Already in Anki (skipped)**
-   - **Not verified** (cards with `(unverified)`) and **Written by the AI from memory (dictionaries were down)**, if any
+   - **Not verified** (words with meaning or pronunciation completed by the AI, marked only in the report/interface) and **Written by the AI from memory (dictionary data missing or unavailable)**, if any; identify the missing parts
    - **Refused lines**: line number, word, and the error
    - **Warnings left**: line number, word, and the message (I will check these cards in Anki)
    - **Import**: how many notes were added, how many have audio, and the batch tag
@@ -172,9 +179,9 @@ When I say "add new words" (or "add the new words", "run it", "make the cards"),
    - add one line to the report: **Removed from `words.txt`** (the words removed, or "all of them — the file is now empty").
      This cleanup is the only edit allowed to `words.txt`.
 
-If both dictionaries are not answering and I am not using `--no-dict`, the script does not stop: the AI writes those cards from memory and marks them `(unverified)`. Words already checked keep their dictionary data and are saved in `dict_cache.json`.
+If FreeDictionaryAPI.com is unavailable or lacks data, the script continues with AI fallback for the missing parts. The cards remain free of verification labels; the report/interface identifies the affected words and data.
 
-The script looks words up in dictionaryapi.dev first and uses Wiktionary as a backup. `dict_cache.json` stores the answers; deleting it only makes the next run slower.
+The script uses FreeDictionaryAPI.com, not dictionaryapi.dev or a separate Wiktionary backup. Lookups are cached in memory during each run. The current workflow does not read or write the legacy `dict_cache.json`; do not delete or modify existing cache files without authorization.
 
 ## Import only (when I ask)
 
@@ -183,9 +190,9 @@ If I say only "import" (for example after I fixed the CSV by hand), skip steps 1
 ## How to run
 
 ```bash
-python anki_words.py                     # uses words.txt, no cards for unverified words
-python anki_words.py --allow-unverified  # also makes cards for unverified words (my default)
-python anki_words.py other.txt           # uses another file
+python anki_words.py                     # words.txt, dictionary API + AI fallback
+python anki_words.py other.txt           # another file, same dictionary + AI workflow
+python anki_words.py --allow-unverified  # legacy alias; same behavior, no labels on cards
 ```
 
 Manual import, only if I ask: in Anki, File > Import > choose the CSV, set the separator to **semicolon**, and turn on **Allow HTML in fields**.
