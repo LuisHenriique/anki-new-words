@@ -24,12 +24,15 @@ It uses no third-party modules itself.
 
 import importlib.util
 import json
+import os
 import re
 import subprocess
 import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
+
+from app_runtime import find_opencode
 
 HERE = Path(__file__).resolve().parent
 ANKI_URL = "http://127.0.0.1:8765"
@@ -47,6 +50,8 @@ def preflight(no_audio):
     missing = [n for n in ("anki_words.py", "check_csv.py", "import_to_anki.py") if not (HERE / n).exists()]
     if missing:
         sys.exit(f"Missing file(s) in {HERE}: {', '.join(missing)}")
+    if not find_opencode():
+        sys.exit("OpenCode CLI not found. Install and configure OpenCode; on Windows use the native opencode.exe.")
     try:
         anki_version()
     except (urllib.error.URLError, ConnectionError, OSError):
@@ -70,6 +75,9 @@ def run_step(title, args):
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
+        encoding="utf-8",
+        errors="replace",
+        env=dict(os.environ, PYTHONIOENCODING="utf-8"),
         bufsize=1,
     )
     lines = []

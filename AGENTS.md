@@ -26,6 +26,9 @@ I collect words in `words.txt`. The agent checks Anki for duplicates, makes the 
 - `check_csv.py`: tests every line of the CSV (errors and warnings).
 - `import_to_anki.py`: adds the good lines of the CSV to Anki through AnkiConnect, only when I ask.
 - `run.py`: one command for the whole pipeline (generate, check, import with audio, clean `words.txt`).
+- `iniciar.py`: beginner launcher; offers a private `.venv` setup, starts the local page, and opens the browser. Installation requires confirmation unless the user explicitly supplies `--yes`; `--check` only diagnoses prerequisites and never calls the AI or imports cards.
+- `app_runtime.py`: shared native OpenCode discovery and cross-platform instance locking. On Windows, use the native `opencode.exe`, not a shell shim.
+- `exemplo_palavras.txt`: generic downloadable example, never a copy of the user's private input. `words.txt` remains local and is not distributed through Git.
 
 ## Input format (`words.txt`)
 
@@ -40,10 +43,11 @@ Ignore empty lines and repeated words (case-insensitive).
 ## Duplicate check
 
 - Use the AnkiConnect add-on at `http://127.0.0.1:8765` (Anki must be open).
-- Search ONLY these two decks (and their subdecks): `English Vocabulary` and `B2 First`. Ignore all other decks. The list is `CHECK_DECKS` at the top of `anki_words.py`.
+- By default, search ONLY `English Vocabulary` and `B2 First` (and their subdecks). The list is `CHECK_DECKS` at the top of `anki_words.py`. When the user explicitly chooses another destination in the website, also include that selected deck and its subdecks for that batch, through `ANKI_IMPORT_DECK`. Ignore every other deck; never silently search the entire collection.
 - For single words, use the whole-word search `w:word`. For phrases, use a quoted search.
 - If the word already exists in any deck, skip it and tell me.
 - If Anki is not reachable, stop and tell me. Do not make cards without checking.
+- In the website, let the user select an existing destination deck without editing source code. Keep the selection in the browser session and pass it only to the selected batch. Do not create decks, change existing notes, store AI credentials in the site, or test model authentication with a hidden AI call. The default destination remains `English Vocabulary` when no explicit selection is supplied.
 
 ## Card format
 
@@ -162,7 +166,7 @@ When I say "add new words" (or "add the new words", "run it", "make the cards"),
    ```bash
    python import_to_anki.py anki_import_fixed.csv
    ```
-   It makes an mp3 of each Front sentence with Google text-to-speech (gTTS), writes `sentence [sound:file.mp3]` in the Front field, and adds the notes to the deck `English Vocabulary` (note type `Basic`) with the tags `english` and a batch tag like `import-20261020`. Lines that still have an ERROR are refused automatically. Do not stop because of ERRORs or WARNINGs: import the good lines and report the rest. Never use AwesomeTTS.
+   It makes an mp3 of each Front sentence with Google text-to-speech (gTTS), writes `sentence [sound:file.mp3]` in the Front field, and adds the notes to the explicitly selected destination deck, or `English Vocabulary` by default (note type `Basic`, fields `Front` and `Back`), with the tags `english` and a batch tag like `import-20261020`. Lines that still have an ERROR are refused automatically. Do not stop because of ERRORs or WARNINGs: import the good lines and report the rest. Never use AwesomeTTS.
 4. **Final report.** Show me one short report with:
    - **Spelling fixed**, for example `acquaintence -> acquaintance`
    - **Already in Anki (skipped)**
@@ -199,10 +203,11 @@ Manual import, only if I ask: in Anki, File > Import > choose the CSV, set the s
 
 ## Requirements
 
-- Python 3
+- Python 3.10 or newer
 - Anki open, with the AnkiConnect add-on (code `2055492159`)
 - `opencode` working in the terminal (the script calls `opencode run`)
 - For audio: `pip install gTTS` (internet needed). If the import says gTTS is missing, tell me the command and do not skip the audio on your own.
+- For beginners, prefer `python iniciar.py`: offer dependency preparation in the private `.venv`, open the local page automatically, and show clear prerequisite guidance. Bind the page only to this computer. Do not terminate or restart an already running instance without authorization; wait for any active batch before shutdown. Keep setup/compatibility tests isolated from real Anki imports and AI calls.
 
 ## Audio for notes that are already in Anki
 
@@ -214,4 +219,4 @@ python import_to_anki.py --audio-only --search "added:2"  # for example: cards a
 python import_to_anki.py --audio-only --dry-run           # only count them
 ```
 
-It touches only notes in the deck `English Vocabulary` whose Front has no `[sound:]`, and it only adds the sound tag. It never changes anything else. Ask me to close the Anki Browser window first.
+It touches only notes in the explicitly selected destination deck, or `English Vocabulary` by default, whose Front has no `[sound:]`, and it only adds the sound tag. The standalone command does not inherit a browser selection; another destination requires an explicit `ANKI_IMPORT_DECK` value in that terminal. It never changes anything else. Ask me to close the Anki Browser window first.

@@ -25,6 +25,31 @@
     </section>
     <div id="message" class="notice error" role="alert" hidden></div>
 
+    <section class="setup" aria-labelledby="setup-title">
+      <div class="section-heading"><h2 id="setup-title">Antes de começar</h2><button id="check-setup" class="secondary-button" type="button">Conferir novamente</button></div>
+      <p id="setup-summary" role="status">Conferindo o que está pronto no seu computador…</p>
+      <ul class="setup-checks">
+        <li id="setup-anki">Anki: aguardando conexão</li>
+        <li id="setup-audio">Áudio: verificando instalação</li>
+        <li id="setup-opencode">OpenCode: verificando instalação</li>
+        <li id="setup-basic">Tipo de nota Basic: verificando</li>
+      </ul>
+      <label class="deck-label" for="deck">Em qual baralho deseja adicionar os cartões?</label>
+      <select id="deck" disabled><option value="">Abra o Anki para escolher</option></select>
+      <p class="setup-help">A escolha fica somente nesta aba. A conexão com a conta de IA não é testada automaticamente, para não gerar custos.</p>
+      <details class="setup-guide">
+        <summary>Primeira vez? Veja como preparar</summary>
+        <ol>
+          <li>Abra o Anki. Em <strong>Ferramentas → Complementos → Obter complementos</strong>, instale <code>2055492159</code> (AnkiConnect) e reinicie o Anki.</li>
+          <li>Crie ou escolha seu baralho no Anki. A página não cria baralhos nem altera suas notas existentes.</li>
+          <li>O importador usa um tipo de nota chamado <strong>Basic</strong>, com os campos <strong>Front</strong> e <strong>Back</strong>. Se o seu Anki usa nomes traduzidos, adicione uma cópia do tipo básico em <strong>Ferramentas → Gerenciar tipos de nota</strong>, dê a ela o nome Basic e ajuste os nomes dos campos nessa cópia.</li>
+          <li>Instale o <a href="https://opencode.ai/v2/docs/" target="_blank" rel="noopener noreferrer">OpenCode CLI</a> e conecte seu próprio provedor de IA com <code>/connect</code> na interface do OpenCode. No Windows, use a versão nativa <code>opencode.exe</code> disponível na documentação. Não coloque suas credenciais neste site ou no repositório.</li>
+          <li>Para preparar o áudio, execute <code>python iniciar.py</code> na pasta do projeto e autorize a instalação das dependências. Depois clique em <strong>Conferir novamente</strong>.</li>
+        </ol>
+        <p>Você pode conferir a página e enviar a lista sem chamar a IA. O consumo de tokens começa quando você manda gerar os cartões; o custo depende do seu provedor e modelo.</p>
+      </details>
+    </section>
+
     <div class="workspace">
       <section class="upload-section" aria-labelledby="upload-title">
         <h2 id="upload-title">Suas próximas palavras</h2>
@@ -41,8 +66,9 @@
 give up
 She *shrugged* and walked away.</pre>
           <p>Tem uma frase? Marque a palavra que quer aprender entre <code>*estrelas*</code>. Textos corridos não são selecionados automaticamente.</p>
+          <a class="example-download" href="/exemplo_palavras.txt" download>Baixar um arquivo de exemplo</a>
         </div>
-        <div class="safety-note"><span aria-hidden="true">✓</span><p>Seu arquivo original não muda. Palavras repetidas são ignoradas e os cartões vão para <strong>English Vocabulary</strong>.</p></div>
+        <div class="safety-note"><span aria-hidden="true">✓</span><p>Seu arquivo original não muda. Palavras repetidas são ignoradas e os cartões vão para <strong id="destination-deck">o baralho escolhido acima</strong>.</p></div>
       </section>
 
       <section class="review-section" aria-labelledby="review-title">
@@ -65,6 +91,11 @@ She *shrugged* and walked away.</pre>
         <h3 id="report-title">Resumo do lote</h3>
         <p id="report-description" class="report-description" role="status"></p>
         <dl id="report-totals" class="report-totals"></dl>
+        <section id="imported-fronts" class="imported-fronts" aria-labelledby="fronts-title" hidden>
+          <h3 id="fronts-title">Frases adicionadas ao Anki</h3>
+          <p>Estas são as frases dos cartões com importação confirmada. A palavra que você está aprendendo aparece em negrito.</p>
+          <ul id="fronts-list" class="fronts-list" lang="en" tabindex="0" aria-label="Frases dos cartões importados"></ul>
+        </section>
         <div id="report-groups" class="report-groups"></div>
         <p id="report-note" class="report-note"></p>
       </section>

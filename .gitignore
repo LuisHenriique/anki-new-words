@@ -19,6 +19,7 @@ venv/
 env/
 credentials.json
 secrets.json
+/.anki-local.json
 *.pem
 *.key
 *.p12

@@ -12,6 +12,52 @@ let busy = false;
 let reading = false;
 let timer = null;
 let currentJob = null;
+let setupReady = false;
+let setupInfo = null;
+let availableDecks = [];
+
+function renderSetup(info) {
+  setupInfo = info;
+  const checks = [
+    ["setup-anki", info.anki, "Anki conectado", "Abra o Anki com o AnkiConnect instalado"],
+    ["setup-audio", info.audio, "Áudio instalado", "Áudio pendente: execute python iniciar.py"],
+    ["setup-opencode", info.opencode, "OpenCode CLI encontrado", "Instale o OpenCode CLI e configure seu acesso à IA"],
+    ["setup-basic", info.basic, "Tipo de nota Basic encontrado", "Prepare o tipo de nota Basic (veja o guia abaixo)"],
+  ];
+  for (const [id, ready, good, pending] of checks) {
+    $(id).textContent = ready ? good : pending;
+    $(id).classList.toggle("ready", Boolean(ready));
+  }
+  const decks = info.decks || [];
+  if (JSON.stringify(decks) !== JSON.stringify(availableDecks)) {
+    const desired = $("deck").value || sessionStorage.getItem("anki-deck") || "English Vocabulary";
+    availableDecks = decks;
+    $("deck").replaceChildren();
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = decks.length ? "Escolha seu baralho" : "Abra o Anki para escolher";
+    $("deck").append(placeholder);
+    for (const name of decks) {
+      const option = document.createElement("option");
+      option.value = name;
+      option.textContent = name;
+      $("deck").append(option);
+    }
+    $("deck").value = decks.includes(desired) ? desired : "";
+  }
+  setupReady = Boolean(info.anki && info.audio && info.opencode && info.basic && availableDecks.includes($("deck").value));
+  $("destination-deck").textContent = $("deck").value || "o baralho escolhido acima";
+  $("setup-summary").textContent = setupReady
+    ? "Tudo pronto para enviar suas palavras. O acesso à conta de IA será usado somente ao gerar os cartões."
+    : "Conclua os itens pendentes e escolha o baralho. Você já pode enviar o arquivo e conferir a lista.";
+  updateButton();
+}
+
+$("deck").addEventListener("change", () => {
+  sessionStorage.setItem("anki-deck", $("deck").value);
+  if (setupInfo) renderSetup(setupInfo);
+});
+$("check-setup").addEventListener("click", () => status());
 function renderImportReport(job) {
   const summary = job.summary;
   const outcome = job.summary.outcome;
@@ -36,6 +82,19 @@ function renderImportReport(job) {
     value.textContent = total.value;
     item.append(label, value);
     $("report-totals").append(item);
+  }
+  const fronts = summary.fronts || [];
+  $("imported-fronts").hidden = fronts.length === 0;
+  $("fronts-list").replaceChildren();
+  for (const front of fronts) {
+    const sentence = document.createElement("li");
+    for (const segment of front.segments) {
+      // Only our own text/strong nodes are rendered, never raw HTML from a card.
+      const span = document.createElement(segment.bold ? "strong" : "span");
+      span.textContent = segment.text;
+      sentence.append(span);
+    }
+    $("fronts-list").append(sentence);
   }
   $("report-groups").replaceChildren();
   if (detailed) {
@@ -108,9 +167,10 @@ async function api(path, options = {}) {
 }
 
 function updateButton() {
-  $("import").disabled = !upload || busy || reading || !token;
+  $("import").disabled = !upload || busy || reading || !token || !setupReady;
   $("import").textContent = busy ? "Importação em andamento…" : "Gerar e adicionar ao Anki";
   $("file").disabled = busy || reading;
+  $("deck").disabled = busy || !availableDecks.length;
 }
 
 async function selectFile(file) {
@@ -253,12 +313,12 @@ for (const name of ["dragleave", "drop"]) {
   });
 }
 $("import").addEventListener("click", async () => {
-  if (!upload || busy) return;
+  if (!upload || busy || !setupReady) return;
   message("");
   busy = true;
   updateButton();
   try {
-    const job = await (await api("/api/jobs", { method: "POST", body: JSON.stringify(upload) })).json();
+    const job = await (await api("/api/jobs", { method: "POST", body: JSON.stringify({ ...upload, deck: $("deck").value }) })).json();
     currentJob = job.id;
     sessionStorage.setItem("anki-job", job.id);
     $("log-details").open = false;
@@ -276,8 +336,7 @@ async function status() {
     const result = await (await api("/api/status")).json();
     $("connection").textContent = result.anki ? "Anki conectado" : "Abra o Anki no computador";
     $("connection").classList.toggle("ready", result.anki);
-    if (!result.audio) message("Para gerar áudio, instale no computador: python -m pip install gTTS");
-    else if (!result.opencode) message("O comando opencode não foi encontrado no computador. Verifique a instalação antes de importar.");
+    renderSetup(result);
     if (result.active && currentJob !== result.active) {
       currentJob = result.active;
       sessionStorage.setItem("anki-job", currentJob);
@@ -286,6 +345,8 @@ async function status() {
       poll(currentJob);
     }
   } catch (error) {
+    setupReady = false;
+    updateButton();
     $("connection").textContent = "Sem conexão com o servidor";
     $("connection").classList.remove("ready");
     message(error.message);

@@ -1,6 +1,8 @@
 import base64
+import csv
 import io
 import json
+import os
 import tempfile
 import threading
 import unittest
@@ -48,6 +50,105 @@ class UploadTests(unittest.TestCase):
         self.assertEqual(result["audio"], "2")
         self.assertEqual(result["tag"], "import-20261117")
         self.assertEqual(len(result["warnings"]), 1)
+
+
+class FrontPreviewTests(unittest.TestCase):
+    def write_cards(self, directory, fronts):
+        path = Path(directory) / "anki_import_fixed.csv"
+        with path.open("w", encoding="utf-8", newline="") as stream:
+            csv.writer(stream, delimiter=";").writerows((front, "Example back") for front in fronts)
+        return path
+
+    def test_confirmed_fronts_preserve_bold_and_do_not_modify_the_csv(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = self.write_cards(directory, ["We bought a new <b>bathtub</b> yesterday.",
+                                                  "I <strong>messed up</strong> the final answer."])
+            before = path.read_bytes()
+            # A confirmed import is enough even with an older generator that
+            # did not emit per-word dictionary metadata. No AI/API calls needed.
+            with patch("web_app.urllib.request.urlopen", side_effect=AssertionError("No network expected")):
+                summary = web_app.summarize("Done! 2 note(s) added to 'English Vocabulary' (tag: import-test)", directory)
+            self.assertEqual(len(summary["fronts"]), 2)
+            self.assertFalse(summary["outcome"]["available"])
+            self.assertEqual(summary["fronts"][0]["segments"], [
+                {"text": "We bought a new ", "bold": False},
+                {"text": "bathtub", "bold": True},
+                {"text": " yesterday.", "bold": False},
+            ])
+            self.assertEqual(path.read_bytes(), before)
+
+    def test_refused_and_anki_rejected_rows_are_excluded_by_csv_row_number(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self.write_cards(directory, ["The <b>first</b> sentence has enough words.",
+                                         "The <b>second</b> sentence was refused.",
+                                         "The <b>third</b> sentence was rejected.",
+                                         "The <b>fourth</b> sentence has enough words."])
+            output = ("Not imported | line 2 | second | invalid card\n"
+                      "Not added (Anki says duplicate or invalid) | line 3 | third\n"
+                      "Done! 2 note(s) added to 'English Vocabulary' (tag: import-test)\n")
+            fronts = web_app.summarize(output, directory)["fronts"]
+            self.assertEqual([front["segments"][1]["text"] for front in fronts], ["first", "fourth"])
+
+    def test_generation_failure_missing_confirmation_and_count_mismatch_show_no_fronts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self.write_cards(directory, ["The <b>first</b> sentence has enough words.",
+                                         "The <b>second</b> sentence has enough words."])
+            for output in ("Done! 2 cards saved", "The import did not finish",
+                           "Done! 1 note(s) added", "Done! 0 note(s) added", "Nothing new to add"):
+                with self.subTest(output=output):
+                    self.assertEqual(web_app.summarize(output, directory)["fronts"], [])
+
+    def test_only_the_fixed_csv_used_by_the_importer_is_read(self):
+        with tempfile.TemporaryDirectory() as directory:
+            (Path(directory) / "anki_import.csv").write_text("Not the imported file;back\n", encoding="utf-8")
+            self.assertEqual(web_app.summarize("Done! 1 note(s) added", directory)["fronts"], [])
+
+    def test_malformed_or_missing_csv_does_not_break_the_report(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "anki_import_fixed.csv"
+            for data in (b'"unfinished quote', b'\xff\xfe', b'only one column\n'):
+                path.write_bytes(data)
+                self.assertEqual(web_app.summarize("Done! 1 note(s) added", directory)["fronts"], [])
+
+    def test_audio_html_attributes_and_executable_tags_are_not_rendered(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self.write_cards(directory, ['We <b onclick="bad()">learn</b> &amp; grow.<br>'
+                                         '<script>alert(1)</script><style>bad CSS</style>'
+                                         '<img src="x" onerror="bad()">[sound:private.mp3]'])
+            front = web_app.summarize("Done! 1 note(s) added", directory)["fronts"][0]
+            text = "".join(segment["text"] for segment in front["segments"])
+            self.assertEqual(text, "We learn & grow. ")
+            self.assertEqual(next(segment["text"] for segment in front["segments"] if segment["bold"]), "learn")
+            self.assertNotIn("private.mp3", json.dumps(front))
+            self.assertNotIn("onclick", json.dumps(front))
+
+    def test_csv_records_with_semicolons_and_line_breaks_keep_their_row_numbers(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self.write_cards(directory, ["She <b>paused</b>;\nthen continued her speech.",
+                                         "He <b>continued</b> speaking after the break."])
+            output = "Not imported | line 2 | continue | refused\nDone! 1 note(s) added"
+            fronts = web_app.summarize(output, directory)["fronts"]
+            self.assertEqual(len(fronts), 1)
+            self.assertIn(";\nthen", "".join(segment["text"] for segment in fronts[0]["segments"]))
+
+    def test_finished_job_publishes_previews_in_its_api_snapshot(self):
+        with tempfile.TemporaryDirectory() as directory:
+            app = web_app.App("secret", directory)
+            text, preview = web_app.read_upload(upload("bathtub\n"))
+            with patch("web_app.threading.Thread"):
+                job_id = app.start(text, preview)
+            job_directory = Path(directory) / job_id
+            self.write_cards(job_directory, ["We bought a new <b>bathtub</b> yesterday."])
+            process = type("Process", (), {
+                "stdout": io.StringIO("Done! 1 note(s) added to 'English Vocabulary' (tag: import-test)\n"),
+                "wait": lambda self: 0,
+            })()
+            with patch("web_app.subprocess.Popen", return_value=process) as popen:
+                app.process(job_id, job_directory)
+            self.assertEqual(popen.call_count, 1)
+            snapshot = app.snapshot(job_id)
+            self.assertEqual(snapshot["state"], "completed")
+            self.assertEqual(len(snapshot["summary"]["fronts"]), 1)
 
 
 class PipelineTests(unittest.TestCase):
@@ -124,7 +225,8 @@ class PipelineTests(unittest.TestCase):
             with patch("web_app.subprocess.Popen", return_value=process) as popen:
                 app.process(job_id, directory)
             self.assertEqual(popen.call_args.kwargs["cwd"], directory)
-            self.assertTrue(popen.call_args.kwargs["start_new_session"])
+            self.assertEqual(popen.call_args.kwargs["start_new_session"], os.name != "nt")
+            self.assertEqual(popen.call_args.kwargs["env"]["ANKI_IMPORT_DECK"], "English Vocabulary")
             self.assertNotIn(str(web_app.ROOT / "words.txt"), popen.call_args.args[0])
             self.assertEqual(app.snapshot(job_id)["state"], "failed")
             self.assertIsNone(app.active)
@@ -144,6 +246,12 @@ class PipelineTests(unittest.TestCase):
 
 class HTTPTests(unittest.TestCase):
     def setUp(self):
+        self.setup_patch = patch("web_app.setup_status", return_value={
+            "anki": True, "audio": True, "opencode": True, "basic": True,
+            "decks": ["English Vocabulary", "Meu Inglês"], "ai_auth_checked": False,
+        })
+        self.setup_patch.start()
+        self.addCleanup(self.setup_patch.stop)
         self.temporary = tempfile.TemporaryDirectory()
         self.server = web_app.ThreadingHTTPServer(("127.0.0.1", 0), web_app.Handler)
         self.server.app = web_app.App("test-key", self.temporary.name)
@@ -174,6 +282,40 @@ class HTTPTests(unittest.TestCase):
     def test_authenticated_preview(self):
         with self.request("/api/preview", upload()) as response:
             self.assertEqual(json.load(response)["count"], 3)
+
+    def test_setup_status_and_sample_download(self):
+        with self.request("/api/status") as response:
+            data = json.load(response)
+            self.assertIn("Meu Inglês", data["decks"])
+            self.assertFalse(data["ai_auth_checked"])
+        with self.request("/exemplo_palavras.txt") as response:
+            self.assertIn(b"*shrugged*", response.read())
+            self.assertIn("exemplo_palavras.txt", response.headers["Content-Disposition"])
+
+    def test_custom_deck_is_carried_into_the_job(self):
+        payload = dict(upload(), deck="Meu Inglês")
+        with patch.object(web_app.App, "process"):
+            with self.request("/api/jobs", payload) as response:
+                job_id = json.load(response)["id"]
+        self.assertEqual(self.server.app.snapshot(job_id)["deck"], "Meu Inglês")
+
+    def test_unknown_deck_or_missing_prerequisite_does_not_start_a_job(self):
+        for payload in (dict(upload(), deck="Not a real deck"), dict(upload(), deck="bad\nname")):
+            with self.assertRaises(urllib.error.HTTPError) as caught:
+                self.request("/api/jobs", payload)
+            self.assertEqual(caught.exception.code, 400)
+            caught.exception.close()
+        for key in ("anki", "audio", "opencode", "basic"):
+            setup = {
+                "anki": True, "audio": True, "opencode": True, "basic": True, "decks": ["English Vocabulary"],
+            }
+            setup[key] = False
+            with patch("web_app.setup_status", return_value=setup):
+                with self.assertRaises(urllib.error.HTTPError) as caught:
+                    self.request("/api/jobs", upload())
+            self.assertEqual(caught.exception.code, 400)
+            caught.exception.close()
+        self.assertEqual(self.server.app.jobs, {})
 
     def test_missing_key_and_foreign_origin_refused(self):
         for token, origin, code in (("wrong", None, 401), ("test-key", "http://evil.example", 403)):

@@ -33,6 +33,7 @@ import hashlib
 import html
 import io
 import json
+import os
 import re
 import sys
 import time
@@ -41,7 +42,7 @@ import urllib.request
 from pathlib import Path
 
 ANKI_URL = "http://127.0.0.1:8765"
-DECK = "English Vocabulary"  # the deck that receives the new cards
+DECK = os.environ.get("ANKI_IMPORT_DECK", "English Vocabulary")  # explicit web selection, otherwise the original default
 NOTE_TYPE = "Basic"  # your note type name (the one with the fields Front and Back)
 BASE_TAGS = ["english"]  # same tag as your other cards
 TTS_LANG = "en"

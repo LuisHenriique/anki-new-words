@@ -22,6 +22,7 @@ import csv
 import difflib
 import html
 import json
+import os
 import re
 import subprocess
 import sys
@@ -30,10 +31,15 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+from app_runtime import find_opencode
+
 ANKI_URL = "http://127.0.0.1:8765"
 # Only these decks are checked for duplicates (subdecks are included automatically).
 # Use the exact deck names from Anki. Empty list [] = check all decks.
 CHECK_DECKS = ["English Vocabulary", "B2 First"]
+SELECTED_DECK = os.environ.get("ANKI_IMPORT_DECK", "").strip()
+if SELECTED_DECK and SELECTED_DECK not in CHECK_DECKS:
+    CHECK_DECKS = [*CHECK_DECKS, SELECTED_DECK]
 # Keep accepting legacy flags used by existing workflow instructions.
 ARGS = [a for a in sys.argv[1:] if not a.startswith("--")]
 INPUT = Path(ARGS[0] if ARGS else "words.txt")
@@ -273,7 +279,8 @@ def in_anki(word):
     clean = re.sub(r'["*:\\]', " ", word).strip()
     query = f"w:{clean}" if " " not in clean else f'"{clean}"'
     if CHECK_DECKS:
-        decks = " or ".join(f'deck:"{d}"' for d in CHECK_DECKS)
+        escaped_decks = [d.replace("\\", "\\\\").replace('"', '\\"') for d in CHECK_DECKS]
+        decks = " or ".join(f'deck:"{d}"' for d in escaped_decks)
         query = f"({decks}) {query}"
     note_ids = anki("findNotes", query=query)
     for start in range(0, len(note_ids), 1000):
@@ -322,9 +329,15 @@ def dedupe(items):
 
 # ---------------------------------------------------------------- AI
 def ask_ai(prompt):
+    executable = find_opencode()
+    if not executable:
+        raise RuntimeError("OpenCode CLI not found. Install and configure OpenCode; on Windows use the native opencode.exe.")
+    if sys.platform == "win32" and len(subprocess.list2cmdline([executable, "run", prompt]).encode("utf-16-le")) // 2 > 30000:
+        raise RuntimeError("This context is too long for Windows. Use shorter input sentences and try again.")
     for _ in range(2):  # one retry
         res = subprocess.run(
-            ["opencode", "run", prompt], capture_output=True, text=True
+            [executable, "run", prompt], capture_output=True, text=True,
+            encoding="utf-8", errors="replace",
         )
         out = res.stdout
         start, end = out.find("["), out.rfind("]")
@@ -387,12 +400,13 @@ def generate_cards(items, strict=False):
     batches, batch, size = [], [], 0
     for it in items:
         payload = {"word": it["word"], "context": it["context"],
-                   "dictionary": it.get("dictionary", []),
+                   "dictionary": it.get("dictionary", [])[:12] if sys.platform == "win32" else it.get("dictionary", []),
                    "target_ipa": it.get("dictionary_target_ipas", {})}
         length = len(json.dumps(payload, ensure_ascii=False).encode())
         # Dictionary references can be much larger than a plain word list.
         # Keep prompts below the OS command-line argument limit.
-        if batch and (len(batch) >= BATCH_SIZE or size + length > 50000):
+        limit = 10000 if sys.platform == "win32" else 50000
+        if batch and (len(batch) >= BATCH_SIZE or size + length > limit):
             batches.append(batch)
             batch, size = [], 0
         batch.append(payload)
