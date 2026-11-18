@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#244bc5">
+  <title>Palavra por palavra · Anki</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Página inicial"><span class="brand-icon" aria-hidden="true">Aa</span> Palavra por palavra</a>
+    <span class="connection" id="connection">Verificando conexão…</span>
+  </header>
+  <main>
+    <section class="intro">
+      <h1>Do seu arquivo<br>para a sua memória.</h1>
+      <p>Envie suas palavras em inglês. Receba cartões no Anki com exemplos, tradução e áudio.</p>
+    </section>
+
+    <section id="access" class="notice" hidden>
+      <h2>Abra seu link de acesso</h2>
+      <p>Use o link completo mostrado no terminal do computador, incluindo a chave depois de <code>#key=</code>.</p>
+    </section>
+    <div id="message" class="notice error" role="alert" hidden></div>
+
+    <div class="workspace">
+      <section class="upload-section" aria-labelledby="upload-title">
+        <h2 id="upload-title">Suas próximas palavras</h2>
+        <label class="dropzone" id="dropzone" for="file">
+          <svg width="42" height="48" viewBox="0 0 42 48" fill="none" aria-hidden="true"><path d="M9 2h17l13 13v30H3V2h6Z" stroke="currentColor" stroke-width="2"/><path d="M25 2v14h14M13 27h16M13 34h11" stroke="currentColor" stroke-width="2"/></svg>
+          <strong id="file-label">Escolha seu arquivo .txt</strong>
+          <span>ou arraste e solte aqui</span>
+          <span class="file-limit">Até 1 MB · 500 palavras por envio</span>
+        </label>
+        <input id="file" class="file-input" type="file" accept=".txt,text/plain" aria-label="Escolher arquivo de palavras">
+        <div class="format-help">
+          <h3>Um item por linha. Qualquer nome de arquivo.</h3>
+          <pre>stumble
+give up
+She *shrugged* and walked away.</pre>
+          <p>Tem uma frase? Marque a palavra que quer aprender entre <code>*estrelas*</code>. Textos corridos não são selecionados automaticamente.</p>
+        </div>
+        <div class="safety-note"><span aria-hidden="true">✓</span><p>Seu arquivo original não muda. Palavras repetidas são ignoradas e os cartões vão para <strong>English Vocabulary</strong>.</p></div>
+      </section>
+
+      <section class="review-section" aria-labelledby="review-title">
+        <div class="section-heading"><h2 id="review-title">Conferir e importar</h2><span class="count" id="count">0 palavras</span></div>
+        <div id="empty" class="empty"><span class="sample-word" aria-hidden="true">learn</span><p>Sua lista aparece aqui.</p><span>Escolha um arquivo para conferir as palavras antes de adicionar ao Anki.</span></div>
+        <p id="preview-note" class="preview-note" hidden></p>
+        <ul id="words" class="word-list" aria-label="Palavras do arquivo" hidden></ul>
+        <div class="import-action">
+          <button id="import" disabled>Gerar e adicionar ao Anki</button>
+          <p>O Anki precisa estar aberto no computador.<br>A geração pode levar alguns minutos.</p>
+        </div>
+      </section>
+    </div>
+
+    <section id="job" class="job" aria-labelledby="job-title" hidden>
+      <div class="job-heading"><div><h2 id="job-title">Preparando seu lote</h2><p id="job-subtitle"></p></div><span id="job-state" class="job-state">Em andamento</span></div>
+      <div id="progress" class="progress" role="progressbar" aria-label="Processamento em andamento"><span></span></div>
+      <p id="job-hint">Você pode acompanhar abaixo. Mantenha o servidor no computador ligado.</p>
+      <div id="result" class="result" hidden></div>
+      <div id="downloads" class="downloads"></div>
+      <details id="log-details"><summary>Ver relatório completo e mensagens do processo</summary><pre id="log" tabindex="0"></pre></details>
+    </section>
+  </main>
+  <footer><span>Aprender inglês, uma palavra de cada vez.</span><span>Executado no seu computador · AnkiConnect</span></footer>
+</body>
+</html>

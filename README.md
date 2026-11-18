@@ -1,423 +1,230 @@
-# Vocabulário de inglês para o Anki
+# Palavras em inglês para o Anki
 
-## O que este projeto faz?
+Envie um arquivo `.txt` pela página local, confira as palavras e adicione cartões ao Anki com:
 
-Transforma uma lista de palavras em inglês em cartões do Anki com:
-
-- Frase de exemplo em nível B2, com o vocabulário-alvo em negrito.
-- Um significado em inglês e transcrição fonética (IPA).
+- Uma frase de exemplo em inglês no nível B2, com a palavra em negrito.
+- Um significado curto em inglês e pronúncia em IPA.
 - Tradução para português brasileiro.
-- Áudio da frase gerado pelo Google Text-to-Speech, via gTTS.
+- Áudio da frase, gerado com Google Text-to-Speech (gTTS).
 
-O conteúdo é gerado pela IA, sem consultas a APIs de dicionários. Revise os significados e a pronúncia quando necessário.
+O tutorial abaixo considera o uso **somente no computador**, com acesso pelo navegador. O conteúdo é escrito pela IA, sem consulta a dicionários; revise os cartões quando necessário.
 
-O fluxo completo é coordenado por `run.py`:
+## 1. Prepare o ambiente
 
-```text
-words.txt
-    |
-    v
-anki_words.py          Gera os cartões e verifica duplicatas no Anki
-    |
-    v
-anki_import.csv
-    |
-    v
-check_csv.py            Valida o CSV e aplica correções seguras
-    |
-    v
-anki_import_fixed.csv
-    |
-    v
-import_to_anki.py       Importa as notas com áudio
-    |
-    v
-Anki                   Baralho English Vocabulary
-    |
-    v
-run.py                 Limpa a lista de entrada e exibe o resumo
-```
+Execute os comandos deste tutorial em um terminal aberto na pasta do projeto.
 
----
+Você precisa de:
 
-## Pré-requisitos
-
-Configure os itens abaixo antes da primeira execução. Execute os comandos deste guia **na pasta do projeto**.
-
-| Requisito | Configuração necessária |
+| Requisito | Como conferir |
 | --- | --- |
-| Python 3 | O comando de verificação abaixo deve informar uma versão 3.x. |
-| Anki | Mantenha o aplicativo aberto durante a geração e a importação. |
-| AnkiConnect | Instale o complemento de código **2055492159** e reinicie o Anki. |
-| Baralhos | A busca de duplicatas usa apenas **English Vocabulary** e **B2 First**, incluindo subbaralhos. |
-| OpenCode | Disponível no terminal; é chamado pelo script para gerar os cartões com IA. |
-| gTTS | Instalado no mesmo ambiente Python usado para executar os scripts. |
-| Internet | Necessária para a IA e o Google Text-to-Speech. |
+| Python 3 | Execute `python --version`. |
+| Anki | Instale o aplicativo e mantenha-o aberto durante o processamento. |
+| AnkiConnect | Instale o complemento conforme as instruções abaixo. |
+| OpenCode | Instale, configure o acesso ao provedor de IA e confira `opencode --version`. |
+| gTTS | Instale com o comando abaixo, no mesmo ambiente Python usado pelo projeto. |
+| Internet | Necessária para a IA e a geração de áudio. |
 
-### 1. Configure o AnkiConnect
+A página usa a biblioteca padrão do Python, sem precisar de um framework web. O servidor atual requer Linux ou macOS por utilizar `fcntl` para impedir duas instâncias simultâneas.
 
-No Anki, acesse **Ferramentas → Complementos → Obter complementos…**, informe o código **2055492159** e reinicie o aplicativo.
+### Instale o AnkiConnect
 
-O AnkiConnect deve estar acessível neste endereço local:
+1. No Anki, abra **Ferramentas → Complementos → Obter complementos…**.
+2. Informe o código público do complemento: `2055492159`.
+3. Reinicie o Anki.
+
+Mantenha o AnkiConnect acessível apenas localmente. Não é necessário disponibilizá-lo na rede.
+
+### Instale a dependência de áudio
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+Se o sistema impedir a instalação global de pacotes, crie um ambiente virtual:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+```
+
+Nesse caso, ative o ambiente com `source .venv/bin/activate` sempre que abrir outro terminal para usar o projeto. Não adicione a pasta `.venv` ao controle de versão.
+
+## 2. Prepare seu arquivo de palavras
+
+Crie um arquivo com qualquer nome terminado em `.txt`, por exemplo `minha_lista.txt`. Use **um item por linha**:
 
 ```text
-http://127.0.0.1:8765
-```
-
-### 2. Verifique Python e OpenCode
-
-```bash
-python --version
-opencode --version
-```
-
-### 3. Instale e verifique o gTTS
-
-```bash
-python -m pip install gTTS
-python -c "import gtts; print(gtts.__version__)"
-```
-
-Se o módulo `pip` não estiver disponível, como pode ocorrer no Arch Linux, use a alternativa abaixo. Ela exige o `uv` instalado e grava o pacote no diretório de pacotes do usuário:
-
-```bash
-uv pip install --target "$(python -c 'import site; print(site.getusersitepackages())')" gTTS
-python -c "import gtts; print(gtts.__version__)"
-```
-
----
-
-## Formato da lista de palavras
-
-Use **um item por linha** em `words.txt`. Você pode misturar palavras, expressões e frases com contexto:
-
-```text
-entreated
+stumble
 give up
-*leapfrogs* the ability to attract top engineers
+She *shrugged* and walked away.
 ```
 
-- **Sem contexto:** escreva somente a palavra ou expressão.
-- **Com contexto:** coloque apenas o vocabulário-alvo entre asteriscos. O restante da linha orienta a escolha do significado.
-- Linhas vazias e itens repetidos são ignorados, sem diferenciar maiúsculas de minúsculas.
-- Erros claros de ortografia são corrigidos automaticamente, como `acquaintence` → `acquaintance`.
+- **Palavra ou expressão:** escreva apenas o que deseja aprender.
+- **Frase com contexto:** coloque o alvo entre `*estrelas*`. O restante da frase ajuda a escolher o significado.
+- Linhas vazias e palavras repetidas são ignoradas, sem diferenciar maiúsculas de minúsculas.
+- Erros claros de ortografia são corrigidos durante a geração, não na prévia.
+- Textos corridos não têm seleção automática de vocabulário: separe os itens antes de enviar.
 
----
+**Limites por envio:** até 1 MB e 500 palavras diferentes. Prefira salvar em UTF-8. A página também aceita UTF-16 com BOM e Windows-1252.
 
-## Como usar
+O arquivo enviado não precisa ser o `words.txt` do projeto.
 
-Escolha **um dos modos** abaixo. Não execute os dois para o mesmo lote de palavras.
+## 3. Abra a página no computador
 
-### Modo Rápido (Recomendado)
-
-#### 1. Prepare a entrada
-
-Adicione os itens a `words.txt`, seguindo o formato acima. Abra o Anki e confirme que os pré-requisitos estão configurados.
-
-#### 2. Execute o fluxo completo
+Com o Anki aberto, execute:
 
 ```bash
-python run.py
+python web_app.py --host 127.0.0.1
 ```
 
-O comando executa, nesta ordem:
+**Use esse comando completo:** a opção `--host 127.0.0.1` restringe o servidor ao próprio computador. Sem essa opção, o servidor também aceita conexões pela rede local.
 
-1. Gera os cartões com IA, sem consultar dicionários.
-2. Valida o CSV, verifica duplicatas no Anki e salva as correções seguras.
+O terminal exibirá um link na linha **Computador**. Abra esse link completo no navegador, incluindo a chave após `#key=`.
+
+- A chave é gerada a cada inicialização; use o novo link ao reiniciar o servidor.
+- Mantenha o terminal e o Anki abertos enquanto usa a página.
+- Não compartilhe o link nem publique capturas de tela que mostrem a chave.
+
+Se a porta padrão estiver ocupada, escolha outra:
+
+```bash
+python web_app.py --host 127.0.0.1 --port 8090
+```
+
+## 4. Envie e confira a lista
+
+1. Clique em **Escolha seu arquivo .txt** ou arraste o arquivo para a área de envio.
+2. Confira a lista em **Conferir e importar**.
+3. Verifique se as palavras e os contextos foram identificados corretamente.
+4. Clique em **Gerar e adicionar ao Anki**.
+
+A prévia apenas lê o arquivo e identifica repetições internas. A verificação de palavras já existentes no Anki acontece durante o processamento.
+
+Cada envio é um lote iniciado pelo botão. Não há processamento automático ao atingir uma quantidade de palavras.
+
+## 5. Acompanhe a geração e a importação
+
+A página executa o fluxo existente, nesta ordem:
+
+1. Corrige grafia, verifica duplicatas no Anki e gera os cartões com IA.
+2. Valida o CSV e aplica as correções seguras disponíveis.
 3. Importa as linhas válidas com áudio.
-4. Remove da lista os itens importados ou já existentes no Anki.
-5. Exibe o resumo com correções de ortografia, duplicatas, linhas recusadas, notas importadas e áudio.
+4. Confere quais palavras ficaram pendentes.
 
-#### 3. Confira o resultado
+A geração pode levar alguns minutos. Apenas um lote é processado por vez. **Não execute os scripts de geração ou importação pelo terminal simultaneamente à página.**
 
-- **ERROR:** consulte a linha indicada; cartões estruturalmente inválidos são recusados pelo importador.
-- **WARNING:** revise o cartão no Anki; o aviso, por si só, não impede a importação.
-- **Sem áudio:** use os comandos da seção [Áudio em notas já importadas](#áudio-em-notas-já-importadas).
-- **Itens mantidos na lista:** precisam de revisão ou de uma nova tentativa.
+As notas são adicionadas ao baralho **English Vocabulary**, com o tipo de nota **Basic** e as etiquetas `english` e `import-AAAAMMDD`. A verificação de vocabulário duplicado considera **English Vocabulary** e **B2 First**, incluindo seus subbaralhos.
 
-Por padrão, o fluxo continua mesmo se a validação apontar erros. Para interromper antes da importação, use `--stop-on-error`.
+## 6. Confira o resultado e baixe os arquivos
 
-#### Opções do modo rápido
-
-| Opção | Comportamento |
-| --- | --- |
-| Sem opções | Usa `words.txt`, importa com áudio e limpa a lista. |
-| Outro arquivo | Usa e, após a importação, limpa a lista informada. |
-| `--dry-run` | Gera e valida os CSVs, mas não importa nem limpa a lista. |
-| `--keep` | Importa normalmente, mas preserva a lista de entrada. |
-| `--stop-on-error` | Interrompe antes da importação se a validação registrar ERROR. |
-| `--no-audio` | Importa sem áudio; use somente se esse for o resultado desejado. |
-
-Copie apenas o comando correspondente ao que deseja fazer:
-
-```bash
-# Fluxo completo com a lista padrão
-python run.py
-
-# Fluxo completo com outra lista
-python run.py minha_lista.txt
-
-# Gerar e conferir sem importar; os CSVs ainda são gravados
-python run.py --dry-run
-
-# Importar sem limpar a lista
-python run.py --keep
-
-# Interromper antes da importação se houver ERROR
-python run.py --stop-on-error
-
-# Importar sem áudio
-python run.py --no-audio
-```
-
-### Modo Passo a Passo (Manual/Avançado)
-
-Use este modo para controlar cada etapa ou retomar um fluxo que falhou. **Não refaça etapas já concluídas para o mesmo lote.**
-
-#### 1. Prepare a entrada
-
-Adicione os itens a `words.txt`, seguindo o formato da lista. Abra o Anki e execute os comandos na pasta do projeto.
-
-#### 2. Gere os cartões
-
-```bash
-python anki_words.py
-```
-
-O script corrige a ortografia, consulta duplicatas nos dois baralhos configurados, lista os itens ignorados e pede à IA a frase, o significado, o IPA e a tradução. O resultado é salvo em `anki_import.csv`.
-
-Para usar outra lista:
-
-```bash
-python anki_words.py other.txt
-```
-
-**Geração com IA:** a IA escreve o significado, o IPA, a frase e a tradução. Não há consulta a dicionários nem leitura ou gravação de cache. Os novos cartões não recebem a marca `(unverified)`.
-
-As opções antigas `--no-dict` e `--allow-unverified` continuam aceitas por compatibilidade, mas não alteram o comportamento. O validador ainda reconhece `(unverified)` em CSVs antigos.
-
-Se a geração falhar, resolva o erro antes de continuar. Se aparecer `Nothing new to add`, não há cartões novos para importar.
-
-#### 3. Valide e corrija o CSV
-
-```bash
-python check_csv.py --fix --anki
-```
-
-- `--fix` corrige apenas negrito duplicado, `(informal)` repetido e asteriscos soltos. O resultado é salvo em **`anki_import_fixed.csv`**.
-- `--anki` verifica novamente se o vocabulário já existe nos baralhos configurados.
-
-Exemplo de saída:
-
-```text
-Line   1 | unclasping | WARNING | the meaning contains ';': give only one meaning
-2 cards checked: 0 error(s) on 0 line(s), 1 warning(s).
-```
+Ao terminar, confira o resumo e abra **Ver relatório completo e mensagens do processo**. O relatório contém as mensagens dos scripts, incluindo correções, duplicatas, recusas e avisos.
 
 | Resultado | O que fazer |
 | --- | --- |
-| ERROR | Leia a mensagem e identifique a linha inválida. O importador recusa erros estruturais detectados em sua própria validação. |
-| WARNING | Revise o conteúdo. A linha pode ser importada se não tiver ERROR. |
-| Sem erros | Prossiga para a importação. |
+| Cartões adicionados | Confira as novas notas no Anki. |
+| Palavras já existentes | Foram ignoradas; não precisam ser importadas novamente. |
+| `ERROR` ou linha recusada | Leia o número da linha e o motivo. Corrija a causa antes de reenviar o item. |
+| `WARNING` | Revise o cartão no Anki; um aviso não impede necessariamente a importação. |
+| Falha no processo | Consulte o relatório antes de repetir. Uma parte do lote pode já ter sido importada. |
+| Nenhuma palavra nova | Nenhum cartão novo foi criado. |
 
-**Atenção:** o importador revalida a estrutura do cartão, mas não repete a busca de vocabulário da opção `--anki`. Ele mantém a proteção nativa do Anki contra notas duplicadas.
+Os botões de download disponibilizam, quando existentes:
 
-Para conferir apenas o arquivo, mesmo com o Anki fechado:
+- **Baixar palavras pendentes:** lista após a limpeza normal do fluxo. Itens importados ou já existentes são removidos quando essa limpeza é concluída.
+- **Baixar anki_import.csv:** cartões gerados, antes das correções seguras.
+- **Baixar anki_import_fixed.csv:** cartões após as correções seguras da validação.
 
-```bash
-python check_csv.py --fix
-```
+**Atenção:** se a geração ou importação falhar, ou se todas as palavras já estiverem no Anki, a lista para download pode continuar completa. Confira o relatório antes de reenviá-la. Baixar um CSV não significa que todas as suas linhas foram importadas.
 
-Essa alternativa **não verifica duplicatas no Anki**. Reabra o Anki antes de importar.
+### Se algum cartão ficar sem áudio
 
-#### 4. Importe as notas com áudio
-
-```bash
-python import_to_anki.py anki_import_fixed.csv
-```
-
-O importador:
-
-1. Revalida as linhas e recusa as que ainda têm erros estruturais.
-2. Gera um MP3 da frase do Front com o Google TTS.
-3. Acrescenta a referência de áudio ao Front.
-4. Adiciona as notas válidas ao baralho **English Vocabulary**, com o tipo de nota **Basic**.
-
-Formato da referência de áudio:
-
-```text
-[sound:arquivo.mp3]
-```
-
-Cada nota recebe as etiquetas:
-
-- `english`.
-- `import-AAAAMMDD`, correspondente ao dia da importação; por exemplo, `import-20261020`.
-
-Uma linha recusada não impede a importação das demais. Se o Google não responder, algumas notas podem ser importadas sem áudio; confira o resumo.
-
-#### 5. Confira a lista de entrada
-
-**Os comandos manuais acima não limpam `words.txt`.** A limpeza automática pertence ao fluxo de `run.py`. Não presuma que a importação isolada removeu os itens da lista.
-
-As regras de limpeza estão na seção [Limpeza da lista de entrada](#limpeza-da-lista-de-entrada) e no passo 5 da tarefa padrão em `AGENTS.md`.
-
-#### Alternativa: importação pela interface do Anki
-
-Se precisar importar o CSV pela interface, em vez de usar o importador Python:
-
-1. No Anki, acesse **Arquivo → Importar**.
-2. Selecione o CSV validado.
-3. Defina o separador como **ponto e vírgula**.
-4. Ative **Permitir HTML nos campos**.
-
-Essa alternativa não executa a geração de áudio do script Python.
-
----
-
-## Verificação de duplicatas
-
-A configuração `CHECK_DECKS`, no início de `anki_words.py`, limita a busca a:
-
-- **English Vocabulary** e seus subbaralhos.
-- **B2 First** e seus subbaralhos.
-
-Uma palavra é considerada existente quando corresponde ao **vocabulário-alvo** do cartão:
-
-- Texto em negrito no **Front**, marcado com `<b>` ou `<strong>`.
-- Vocabulário identificado no cabeçalho **Meaning (...)** do **Back**, incluindo a forma base dos verbos no formato usado pelo projeto.
-
-Ocorrências soltas na frase, na definição ou na tradução **não bastam** para bloquear um novo cartão. Por exemplo, `haste` na tradução de *rod* e `courage` na definição de *guts* não são duplicatas desses vocabulários.
-
-Cartões antigos sem essas marcações podem não ser reconhecidos como duplicatas. A comparação não diferencia maiúsculas de minúsculas.
-
----
-
-## Limpeza da lista de entrada
-
-Após uma importação concluída pelo modo rápido:
-
-- Itens importados e itens já existentes no Anki são removidos da lista.
-- Linhas que falharam são mantidas com o texto original, os asteriscos e o contexto, na mesma ordem.
-- Se todos os itens forem removidos, o arquivo permanece no projeto, vazio.
-- Ao usar outra lista, a limpeza se aplica ao arquivo informado.
-
-A lista **não é limpa** quando não há palavras novas, a geração falha, a importação não termina com sucesso ou são usadas as opções `--dry-run` ou `--keep`. Se o Anki ficar inacessível durante a conferência da limpeza, o arquivo também é preservado.
-
----
-
-## Formato dos cartões e do CSV
-
-O CSV usa **UTF-8**, separador **ponto e vírgula** e dois campos por linha:
-
-```text
-Front;Back
-```
-
-Exemplo de linha:
-
-```text
-They still <b>cling</b> to hope today.;Meaning (verb, imperative, cling): to hold tightly<br>Phonetic: /klɪŋ/<br>Tradução: agarrar-se, apegar-se, grudar
-```
-
-| Campo | Conteúdo esperado |
-| --- | --- |
-| Front | Frase natural em nível B2. Busque 6 a 10 palavras, com no mínimo 5, e destaque o vocabulário-alvo em negrito. |
-| Back | Um significado curto em inglês, classe gramatical, IPA e 1 a 3 traduções em português brasileiro. |
-
-- Para verbos, o cabeçalho inclui a forma base, como no exemplo acima.
-- As partes do Back são separadas por `<br>` para exibição com HTML no Anki.
-- Aspas em campos do CSV podem ser necessárias para representar caracteres especiais; não são, por si só, um erro.
-
-Consulte `AGENTS.md` para as regras completas de conteúdo, tradução e validação.
-
----
-
-## Comandos úteis de importação
-
-Os comandos de geração e validação estão nos dois modos de uso. As opções abaixo servem para trabalhar com um CSV já existente:
-
-| Opção | Resultado |
-| --- | --- |
-| CSV informado | Importa o arquivo escolhido com áudio. |
-| Sem nome de arquivo | Usa `anki_import.csv`. |
-| `--dry-run` | Mostra o que seria importado, sem adicionar notas ou gerar áudio. |
-| `--no-audio` | Importa sem gerar áudio. |
-
-Copie apenas o comando necessário:
+Confira a conexão com a internet. Para tentar adicionar o áudio às notas com a etiqueta de importação de hoje, feche a janela do **Navegador do Anki**, mantenha o aplicativo aberto e execute, sem outro lote em andamento:
 
 ```bash
-# Importar o CSV validado
-python import_to_anki.py anki_import_fixed.csv
-
-# Importar o CSV padrão: anki_import.csv
-python import_to_anki.py
-
-# Simular a importação do CSV padrão
-python import_to_anki.py --dry-run
-
-# Importar o CSV padrão sem áudio
-python import_to_anki.py --no-audio
-```
-
-### Áudio em notas já importadas
-
-**Feche a janela do Navegador do Anki antes de executar. Mantenha o aplicativo Anki aberto.**
-
-O modo `--audio-only` atua apenas em notas do baralho **English Vocabulary** cujo Front ainda não contém áudio. Ele acrescenta o áudio sem alterar o restante do conteúdo.
-
-```bash
-# Adicionar áudio às notas com a etiqueta de importação de hoje
 python import_to_anki.py --audio-only
+```
 
-# Adicionar áudio às notas dos últimos dois dias
-python import_to_anki.py --audio-only --search "added:2"
+Esse comando atua nas notas de **English Vocabulary** que ainda não têm áudio no campo Front. Para apenas contar as notas que receberiam áudio:
 
-# Apenas contar as notas que receberiam áudio
+```bash
 python import_to_anki.py --audio-only --dry-run
 ```
 
----
+## 7. Encerre com segurança
+
+1. Aguarde o lote terminar e confira o resultado.
+2. Baixe os arquivos que deseja guardar.
+3. No terminal do servidor, pressione **Ctrl+C**.
+
+Se houver um lote ativo, o servidor aguardará sua conclusão antes de encerrar. Não force o encerramento nem desligue o computador durante a importação.
+
+## Onde ficam os dados
+
+- A página cria uma pasta temporária isolada para cada lote e executa cópias dos scripts nessa pasta.
+- O arquivo original enviado, o `words.txt` do projeto e os CSVs existentes na pasta do projeto não são alterados pela página.
+- A limpeza da lista ocorre apenas na cópia enviada para o lote.
+- O terminal informa onde os arquivos temporários foram guardados. Eles não são armazenamento permanente: baixe os resultados importantes.
+- O histórico exibido pela página e a chave de acesso valem apenas enquanto aquela instância do servidor estiver ligada.
+
+### Privacidade
+
+A página é local, mas **o processamento não é totalmente offline**:
+
+- As palavras e seus contextos são enviados ao provedor de IA configurado no OpenCode para gerar os cartões.
+- As frases dos cartões são enviadas ao serviço de voz do Google para gerar áudio.
+
+Não envie senhas, tokens, documentos privados ou frases com dados pessoais sensíveis. Não versione listas pessoais, CSVs com conteúdo privado, credenciais, links de acesso ou configurações secretas. Os exemplos deste tutorial são genéricos e não contêm chaves reais ou caminhos pessoais.
 
 ## Solução de problemas
 
-| Mensagem ou sintoma | O que fazer |
+| Problema | Solução |
 | --- | --- |
-| `Cannot reach Anki` | Abra o Anki. Confirme a instalação do AnkiConnect e reinicie o aplicativo. |
-| `No module named gtts` ou `gTTS is missing` | Instale o gTTS no mesmo ambiente Python. Use os comandos de [Pré-requisitos](#pré-requisitos). |
-| `words.txt is empty` | Adicione pelo menos um item à lista antes de executar. |
-| `Nothing new to add` | Todos os itens identificados já existem no Anki. A lista permanece intacta. |
-| Linha recusada com ERROR | Consulte o número da linha e a mensagem da validação. Corrija a causa antes de tentar importar essa linha novamente. |
-| `bulked up` sem negrito | Confira se a frase usa exatamente a forma-alvo e se ela está entre as tags de negrito. |
-| Cartões sem áudio | Confira a conexão e tente o modo `--audio-only` mais tarde. Feche antes o Navegador do Anki. |
-| Palavras permanecem na lista | Confira as falhas no resumo. O modo manual e a opção `--keep` não limpam a entrada. |
-| CSV com campos entre aspas | Não remova as aspas automaticamente. Se houver dois significados separados por ponto e vírgula, mantenha apenas um significado. |
-| Dúvida sobre significado ou IPA | Revise o conteúdo gerado pela IA; o projeto não faz verificação em dicionários. |
+| A página pede uma chave de acesso | Abra o link completo mostrado no terminal, incluindo `#key=`. |
+| O link antigo deixou de funcionar | O servidor foi reiniciado; abra o novo link. |
+| A página não abre | Confira se o servidor continua rodando e se está usando a porta indicada no terminal. |
+| Porta ocupada | Inicie com `--host 127.0.0.1 --port 8090`. |
+| Já existe uma página rodando | Use a instância aberta ou encerre-a antes de iniciar outra. |
+| Anki desconectado ou `Cannot reach Anki` | Abra o Anki, confira o AnkiConnect e reinicie o Anki se acabou de instalar o complemento. |
+| gTTS ausente | Execute `python -m pip install -r requirements.txt` no mesmo ambiente Python. |
+| OpenCode não encontrado | Confira a instalação e se `opencode --version` funciona no terminal do servidor. |
+| Falha de autenticação ou geração na IA | Confira o provedor configurado no OpenCode e leia o relatório completo. |
+| Arquivo recusado | Use `.txt`, respeite os limites e salve como UTF-8. |
+| A página perdeu conexão | Mantenha o servidor ligado e abra novamente o link; o lote pode continuar no computador. |
+| Dúvida sobre significado ou IPA | Revise o conteúdo: os cartões são escritos pela IA sem verificação em dicionários. |
 
-Se o modo rápido falhar, identifique a última etapa concluída e use o modo manual para retomar a partir da etapa pendente. Não execute novamente todo o fluxo sem conferir o que já foi importado.
+## Alternativa: usar somente o terminal
 
----
+Sem o servidor web processando outro lote, você também pode preparar `words.txt` e executar:
 
-## Estrutura do projeto
-
-```text
-Learning Language/
-├── README.md                # Guia de uso
-├── AGENTS.md                # Regras operacionais do agente
-├── words.txt                # Lista de entrada
-├── run.py                   # Fluxo completo e limpeza da entrada
-├── anki_words.py            # Geração dos cartões e busca de duplicatas
-├── check_csv.py             # Validação e correções seguras
-├── import_to_anki.py        # Importação das notas e geração de áudio
-├── anki_import.csv          # CSV gerado
-└── anki_import_fixed.csv    # CSV com correções seguras
+```bash
+python run.py
 ```
 
-Os CSVs são arquivos gerados e não precisam ser versionados. Um eventual `dict_cache.json` de versões anteriores não é mais usado e não foi removido por esta atualização. Para manter os arquivos gerados e esse cache legado fora do Git, use as regras abaixo em `.gitignore`, caso ainda não estejam configuradas:
+Ou usar outro arquivo:
 
-```gitignore
-__pycache__/
-*.pyc
-anki_import*.csv
-dict_cache.json
+```bash
+python run.py minha_lista.txt
+```
+
+**Diferentemente do upload pela página, esse comando pode limpar o próprio arquivo informado:** após uma importação concluída, remove as palavras importadas ou já presentes no Anki e mantém as pendentes. Para preservar a lista, use:
+
+```bash
+python run.py minha_lista.txt --keep
+```
+
+Para gerar e validar sem importar nem limpar a lista:
+
+```bash
+python run.py minha_lista.txt --dry-run
+```
+
+Essa simulação ainda usa a IA e grava os CSVs de saída. Não execute novamente o fluxo para um lote já importado sem conferir o resultado anterior.
+
+## Testes da interface local
+
+Os testes abaixo não fazem importações reais no Anki:
+
+```bash
+python -B -m unittest discover -s tests -p 'test_web_app.py' -v
 ```
