@@ -140,7 +140,10 @@ def summarize(output):
         "audio": find(r"Audio added to (\d+) of \d+"),
         "audio_total": find(r"Audio added to \d+ of (\d+)"),
         "tag": find(r"Done! \d+ note\(s\) added to '[^']+' \(tag: ([^)]+)\)"),
-        "nothing_new": "Nothing new to add" in output,
+        "nothing_new": "Nothing new to add" in output,rn
+
+Sua lista aparece aqui.
+
         "dictionary": dictionary,
         "outcome": {"imported": imported, "imported_ai": imported_ai,
                     "skipped": skipped, "failed": failed, "unconfirmed": unconfirmed,
@@ -329,7 +332,7 @@ def local_ip():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=8080)
     args = parser.parse_args()
     missing = [name for name in SCRIPTS if not (ROOT / name).is_file()]
